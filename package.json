@@ -1,14 +1,23 @@
 {
-  "name": "deriv-telegram-bot",
+  "name": "telegram-deriv-bot",
   "version": "1.0.0",
-  "description": "Telegram bot connected to Deriv WebSocket",
+  "description": "بوت تلغرام متصل بـ Deriv API مع تحكم بالبدء والإيقاف وصلاحيات المستخدمين",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "keywords": [
+    "telegram",
+    "bot",
+    "deriv",
+    "websocket",
+    "trading",
+    "volatility"
+  ],
+  "author": "Khoury",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "fs": "^0.0.1-security",
     "node-telegram-bot-api": "^0.61.0",
     "ws": "^8.13.0"
   }
