@@ -17,7 +17,33 @@ const accessList = JSON.parse(fs.readFileSync('access_list.json'));
 const users = {};
 
 // --- بدء بوت Telegram ---
+function enterTrade(ws, user, chatId, direction) {
+  if (user.inTrade) return; // لا تدخل صفقة جديدة إذا في صفقة مفتوحة
 
+  user.inTrade = true;
+
+  // نوع العقد حسب الاتجاه
+  const contractType = direction === 'Rise' ? 'CALL' : 'PUT';
+
+  const buyRequest = {
+    buy: 1,
+    subscribe: 1,
+    price: user.currentStake,
+    parameters: {
+      amount: user.currentStake,
+      basis: 'stake',
+      contract_type: contractType,
+      currency: 'USD',
+      duration: 5,         // مدة الصفقة 5 دقائق (ممكن تعدل)
+      duration_unit: 'm',
+      symbol: 'R_100',     // تأكد رمز الزوج المناسب
+    }
+  };
+
+  ws.send(JSON.stringify(buyRequest));
+
+  bot.sendMessage(chatId, `🚀 تم دخول صفقة ${direction} بمبلغ ${user.currentStake.toFixed(2)} USD`);
+}
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const isAllowed = accessList.allowed_ids.includes(chatId);
