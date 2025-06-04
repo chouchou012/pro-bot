@@ -2,7 +2,6 @@ const WebSocket = require('ws');
 const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 const fs = require('fs');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -92,11 +91,12 @@ function startBot(chatId, user) {
 
       // الاشتراك في بيانات الشموع الدقيقة لزوج R_100
       ws.send(JSON.stringify({
-        ticks_history: 'R_100',
+        ticks_history: 'R_100',     // أو أي رمز تريده
         style: 'candles',
         end: 'latest',
         count: 3,
-        subscribe: 1,
+        granularity: 60,            // شموع دقيقة واحدة
+        subscribe: 1
       }));
     }
 
@@ -110,8 +110,8 @@ function startBot(chatId, user) {
       }
     }
 
-    if (msg.msg_type === 'buy') {
-      const info = msg.buy;
+    if (msg.msg_type === 'Rise') {
+      const info = msg.Rise;
       bot.sendMessage(chatId,
                       `📄 تم تنفيذ الصفقة.\nاتجاه: ${info.contract_type}\nالمبلغ: ${info.buy_price} USD\nرقم: ${info.transaction_id}`);
       user.inTrade = true;
@@ -173,7 +173,7 @@ function analyzeCandles(candles) {
   const currBody = Math.abs(curr.close - curr.open);
 
   if (prev_bearish && curr_bullish && engulfing && currBody > avgBody * 0.5) {
-    return 'CALL'; // اشارة شراء
+    return 'Rise'; // اشارة شراء
   }
 
   // نفس الشيء للشمعة الابتلاعية الهبوطية bearish engulfing
@@ -184,7 +184,7 @@ function analyzeCandles(candles) {
   const engulfing_bear = (curr.open > prev.close) && (curr.close < prev.open);
 
   if (prev_bullish && curr_bearish && engulfing_bear && currBody > avgBody * 0.5) {
-    return 'PUT'; // اشارة بيع
+    return 'Fall'; // اشارة بيع
   }
 
   return false;
@@ -205,7 +205,7 @@ function enterTrade(ws, user, chatId, signal) {
     parameters: {
       amount: user.currentStake,
       basis: 'stake',
-      contract_type: signal === 'CALL' ? 'CALL' : 'PUT',
+      contract_type: signal === 'Rise' ? 'Rise' : 'Fall',
       currency: 'USD',
       duration: duration,
       duration_unit: 'm',
