@@ -91,11 +91,11 @@ function startBot(chatId, user) {
 
       // الاشتراك في بيانات الشموع الدقيقة لزوج R_100
       ws.send(JSON.stringify({
-        ticks_history: 'R_100',     // أو أي رمز تريده
+        ticks_history: 'R_100',
         style: 'candles',
         end: 'latest',
         count: 3,
-        granularity: 60,            // شموع دقيقة واحدة
+        granularity: 60,
         subscribe: 1
       }));
     }
@@ -108,18 +108,6 @@ function startBot(chatId, user) {
           enterTrade(ws, user, chatId, signal);
         }
       }
-    }
-
-    if (msg.msg_type === 'Rise') {
-      const info = msg.Rise;
-      bot.sendMessage(chatId,
-                      `📄 تم تنفيذ الصفقة.\nاتجاه: ${info.contract_type}\nالمبلغ: ${info.buy_price} USD\nرقم: ${info.transaction_id}`);
-      user.inTrade = true;
-
-      setTimeout(() => {
-        user.inTrade = false;
-        user.currentStake = user.initialStake;
-      }, 60000);
     }
 
     if (msg.msg_type === 'proposal_open_contract') {
@@ -150,41 +138,26 @@ function startBot(chatId, user) {
   });
 }
 
-// --- دالة تحليل الشموع لشمعة ابتلاعية + تحليل مبسط ---
+// --- دالة تحليل الشموع حسب شروطك ---
 
 function analyzeCandles(candles) {
-  // الشمعة الابتلاعية bullish engulfing:
-  // شمعة سابقة هبوطية (close < open)
-  // شمعة حالية صاعدة (close > open)
-  // جسم الشمعة الحالية يغطي جسم الشمعة السابقة بالكامل
-
   if (candles.length < 2) return false;
 
   const prev = candles[candles.length - 2];
   const curr = candles[candles.length - 1];
 
-  const prev_bearish = prev.close < prev.open;
-  const curr_bullish = curr.close > curr.open;
-
-  const engulfing = (curr.open < prev.close) && (curr.close > prev.open);
-
-  // نضيف شرط بسيط للذكاء الاصطناعي: تحقق من أن جسم الشمعة الحالية أكبر من 50% من متوسط حجم آخر 3 شموع
-  const avgBody = candles.slice(-3).reduce((a, c) => a + Math.abs(c.open - c.close), 0) / 3;
-  const currBody = Math.abs(curr.close - curr.open);
-
-  if (prev_bearish && curr_bullish && engulfing && currBody > avgBody * 0.5) {
-    return 'Rise'; // اشارة شراء
+  // شرط الشمعة السابقة حمراء (هبوط)
+  if (prev.close < prev.open &&
+      curr.close > curr.open &&
+      curr.close > prev.open) {
+    return 'Rise';
   }
 
-  // نفس الشيء للشمعة الابتلاعية الهبوطية bearish engulfing
-
-  const prev_bullish = prev.close > prev.open;
-  const curr_bearish = curr.close < curr.open;
-
-  const engulfing_bear = (curr.open > prev.close) && (curr.close < prev.open);
-
-  if (prev_bullish && curr_bearish && engulfing_bear && currBody > avgBody * 0.5) {
-    return 'Fall'; // اشارة بيع
+  // شرط الشمعة السابقة خضراء (صعود)
+  if (prev.close > prev.open &&
+      curr.close < curr.open &&
+      curr.close < prev.open) {
+    return 'Fall';
   }
 
   return false;
@@ -195,7 +168,7 @@ function analyzeCandles(candles) {
 function enterTrade(ws, user, chatId, signal) {
   if (!user.active || user.inTrade) return;
 
-  // عقد لمدة دقيقة واحدة (60 ثانية)
+  // مدة الصفقة 1 دقيقة
   const duration = 1;
 
   const buyRequest = {
@@ -210,8 +183,6 @@ function enterTrade(ws, user, chatId, signal) {
       duration: duration,
       duration_unit: 'm',
       symbol: 'R_100',
-      //'barrier': null, // تركها null لصفقة عادية
-      //'prediction': null,
     },
   };
 
