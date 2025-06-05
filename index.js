@@ -1,188 +1,191 @@
 const TelegramBot = require('node-telegram-bot-api');
 const WebSocket = require('ws');
-const express = require('express');
 const fs = require('fs');
-const https = require('https');
+const express = require('express');
 
 const TOKEN = '7870976286:AAFdEkl8sIZBABUHY11LXFJ9zhR537BIqQs';
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-const accessListPath = './access_list.json';
-let accessList = JSON.parse(fs.readFileSync(accessListPath));
-
-const app = express();
+const accessList = JSON.parse(fs.readFileSync('./access_list.json'));
 const PORT = process.env.PORT || 3000;
+const app = express();
 
-let usersData = {};  // لتخزين بيانات كل مستخدم
+let usersData = {};
+let stats = {};
 
-// صلاحية الوصول
+// Express server for UptimeRobot
+app.get('/', (req, res) => {
+  res.send('Bot is running...');
+});
+app.listen(PORT, () => {
+  console.log(`Express running on port ${PORT}`);
+});
+
 function hasAccess(userId) {
   return accessList.allowed_ids.includes(userId);
 }
 
-// WebSocket لتحليل السوق فقط
-const wsUrl = 'wss://green.derivws.com/websockets/v3?app_id=22168';
-let ws;
-
-function startWebSocket() {
-  ws = new WebSocket(wsUrl);
-
-  ws.on('open', () => {
-    console.log('✅ WebSocket connected.');
-    // يمكنك الاشتراك بإشارات السوق هنا
-  });
-
-  ws.on('message', (msg) => {
-    const data = JSON.parse(msg);
-    // تحليل البيانات سيتم لاحقًا هنا
-  });
-
-  ws.on('close', () => {
-    console.log('⚠ WebSocket closed.');
-    // لا نعيد الاتصال تلقائيًا
-  });
-
-  ws.on('error', (err) => {
-    console.error('❗ WebSocket error:', err.message);
-  });
-}
-
-startWebSocket();
-
-// ⚙ Express لإبقاء البوت يعمل (UptimeRobot)
-app.get('/', (req, res) => {
-  res.send('Bot is running');
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-});
-
-// Telegram Bot
-bot.on('message', async (msg) => {
+// Telegram: /start
+bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
 
   if (!hasAccess(chatId)) {
-    bot.sendMessage(chatId, '❌ عذرًا، ليس لديك صلاحية استخدام هذا البوت.');
+    bot.sendMessage(chatId, '❌ لا تملك صلاحية الوصول لهذا البوت.');
     return;
   }
 
-  if (msg.text === '/start') {
-    usersData[chatId] = { step: 'awaiting_token' };
-    bot.sendMessage(chatId, '👋 مرحبًا! الرجاء إدخال Deriv API Token الخاص بك:');
-    return;
-  }
+  usersData[chatId] = { step: 'awaiting_token' };
+  bot.sendMessage(chatId, '🔐 أرسل Deriv API Token الخاص بك:');
+});
 
-  if (!usersData[chatId]) {
-    bot.sendMessage(chatId, '📌 الرجاء بدء المحادثة باستخدام /start.');
-    return;
-  }
+// Telegram: Responses
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  if (!hasAccess(chatId) || msg.text.startsWith('/')) return;
 
-  const userState = usersData[chatId];
+  const user = usersData[chatId];
+  if (!user) return;
 
-  switch (userState.step) {
+  switch (user.step) {
     case 'awaiting_token':
-      userState.token = msg.text.trim();
-      userState.step = 'awaiting_stake';
-      bot.sendMessage(chatId, '💰 ادخل مبلغ الستيك (Stake):');
-
-      // ✅ جلب الرصيد مباشرة بعد إدخال التوكن
-      getBalance(userState.token, (balance) => {
-        if (balance !== null) {
-          bot.sendMessage(chatId, `💼 رصيد حسابك الحالي هو: ${balance} USD`);
-        } else {
-          bot.sendMessage(chatId, '⚠ لم يتم جلب الرصيد. تحقق من التوكن.');
-        }
-      });
-
+      user.token = msg.text.trim();
+      user.step = 'awaiting_stake';
+      bot.sendMessage(chatId, '💰 أرسل قيمة الستيك (Stake) بالدولار:');
       break;
 
     case 'awaiting_stake':
       const stake = parseFloat(msg.text);
       if (isNaN(stake) || stake <= 0) {
-        bot.sendMessage(chatId, '❌ الرجاء إدخال مبلغ صحيح للستيك.');
+        bot.sendMessage(chatId, '❌ أدخل مبلغًا صحيحًا.');
         return;
       }
-      userState.stake = stake;
-      userState.step = 'awaiting_tp';
-      bot.sendMessage(chatId, '🎯 ادخل نقطة الربح (Take Profit):');
-      break;
-
-    case 'awaiting_tp':
-      const tp = parseFloat(msg.text);
-      if (isNaN(tp) || tp <= 0) {
-        bot.sendMessage(chatId, '❌ الرجاء إدخال رقم صحيح للربح.');
-        return;
-      }
-      userState.tp = tp;
-      userState.step = 'awaiting_sl';
-      bot.sendMessage(chatId, '🛑 ادخل نقطة وقف الخسارة (Stop Loss):');
-      break;
-
-    case 'awaiting_sl':
-      const sl = parseFloat(msg.text);
-      if (isNaN(sl) || sl <= 0) {
-        bot.sendMessage(chatId, '❌ الرجاء إدخال رقم صحيح للخسارة.');
-        return;
-      }
-      userState.sl = sl;
-      userState.step = 'ready';
-      bot.sendMessage(chatId, '✅ تم حفظ الإعدادات! سيتم تحليل السوق وإعلامك بالإشارات.');
-
-      // إعادة إرسال الرصيد تأكيدًا
-      getBalance(userState.token, (balance) => {
-        if (balance !== null) {
-          bot.sendMessage(chatId, `📊 رصيدك الحالي هو: ${balance} USD`);
+      user.stake = stake;
+      user.step = 'ready';
+      stats[chatId] = { wins: 0, losses: 0 };
+      bot.sendMessage(chatId, `✅ تم الحفظ!\nStake: ${stake}$`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '▶ بدء البوت', callback_data: 'start_bot' }],
+            [{ text: '⏹ إيقاف البوت', callback_data: 'stop_bot' }]
+          ]
         }
       });
-
-      break;
-
-    case 'ready':
-      bot.sendMessage(chatId, '🤖 البوت يعمل ويحلل السوق، الرجاء الانتظار...');
-      break;
-
-    default:
-      bot.sendMessage(chatId, '⚠ خطأ في البيانات. يرجى إعادة البدء باستخدام /start.');
-      delete usersData[chatId];
       break;
   }
 });
 
-// ✅ دالة لجلب الرصيد من Deriv
-function getBalance(token, callback) {
-  const postData = JSON.stringify({
-    authorize: token
+// Telegram: Buttons
+bot.on('callback_query', (query) => {
+  const chatId = query.message.chat.id;
+  const user = usersData[chatId];
+  if (!user || user.step !== 'ready') return;
+
+  if (query.data === 'start_bot') {
+    if (user.botRunning) {
+      bot.sendMessage(chatId, '⚠ البوت يعمل بالفعل.');
+      return;
+    }
+    user.botRunning = true;
+    bot.sendMessage(chatId, '✅ تم تشغيل البوت.');
+    startTrading(user, chatId);
+  }
+
+  if (query.data === 'stop_bot') {
+    user.botRunning = false;
+    bot.sendMessage(chatId, '🛑 تم إيقاف البوت.');
+  }
+});
+
+// ---------------------- TRADING FUNCTION ----------------------
+
+function startTrading(user, chatId) {
+  const ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=22168');
+
+  let lastCandleTime = 0;
+
+  ws.on('open', () => {
+    ws.send(JSON.stringify({ authorize: user.token }));
+
+    // Ping كل ثانية للحفاظ على الاتصال
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ ping: 1 }));
+      }
+    }, 1000);
   });
 
-  const options = {
-    hostname: 'api.deriv.com',
-    port: 443,
-    path: '/websockets/v3',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  };
+  ws.on('message', (msg) => {
+    const data = JSON.parse(msg);
 
-  const ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=16929');
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ authorize: token }));
-  };
-
-  ws.onmessage = (msg) => {
-    const data = JSON.parse(msg.data);
     if (data.msg_type === 'authorize') {
-      ws.send(JSON.stringify({ balance: 1, subscribe: 0 }));
-    } else if (data.msg_type === 'balance') {
-      const balance = data.balance.balance;
-      ws.close();
-      callback(balance);
+      ws.send(JSON.stringify({
+        ticks_history: 'R_100',
+        style: 'candles',
+        granularity: 600, // 10 دقائق
+        count: 1,
+        subscribe: 1
+      }));
     }
-  };
 
-  ws.onerror = () => {
-    callback(null);
-  };
+    if (data.msg_type === 'candles') {
+      const candle = data.candles[0];
+
+      // تأكد من أنه شمعة جديدة
+      if (candle.epoch !== lastCandleTime) {
+        lastCandleTime = candle.epoch;
+
+        const direction = candle.close > candle.open ? 'FALL' : 'RISE';
+        bot.sendMessage(chatId, `📊 شمعة جديدة:\n🕒 ${new Date(candle.epoch * 1000).toLocaleTimeString()}\n📉 Candle Close: ${candle.close}\n📈 Candle Open: ${candle.open}\n🧭 صفقة عكسية: ${direction}`);
+
+        if (user.botRunning) {
+          enterTrade(ws, user, chatId, direction);
+        }
+      }
+    }
+
+    if (data.msg_type === 'RISE') {
+      bot.sendMessage(chatId, `✅ تم دخول الصفقة بقيمة ${user.stake}$`);
+    }
+
+    if (data.msg_type === 'proposal_open_contract') {
+      const status = data.proposal_open_contract.status;
+      const balance = data.proposal_open_contract.balance_after;
+
+      if (status === 'won') {
+        stats[chatId].wins++;
+        bot.sendMessage(chatId, `🎉 ربحت الصفقة!\n💰 الرصيد الحالي: ${balance}`);
+      } else if (status === 'lost') {
+        stats[chatId].losses++;
+        bot.sendMessage(chatId, `💥 خسرت الصفقة.\n💰 الرصيد الحالي: ${balance}`);
+      }
+    }
+  });
+
+  ws.on('error', (err) => {
+    bot.sendMessage(chatId, `❌ خطأ في WebSocket: ${err.message}`);
+  });
+
+  ws.on('close', () => {
+    bot.sendMessage(chatId, `⚠ تم قطع الاتصال. إعادة المحاولة خلال 3 ثوان...`);
+    if (user.botRunning) {
+      setTimeout(() => startTrading(user, chatId), 3000);
+    }
+  });
+}
+
+// تنفيذ الصفقة
+function enterTrade(ws, user, chatId, direction) {
+  ws.send(JSON.stringify({
+    buy: 1,
+    price: user.stake,
+    parameters: {
+      amount: user.stake,
+      basis: 'stake',
+      contract_type: direction,
+      currency: 'USD',
+      duration: 1,
+      duration_unit: 'm',
+      symbol: 'R_100'
+    }
+  }));
 }
