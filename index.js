@@ -20,7 +20,7 @@ function hasAccess(userId) {
 }
 
 // WebSocket لقراءة بيانات السوق والتحليل فقط (Volatility 100 Index)
-const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=16929';
+const wsUrl = 'wss://green. derivws.com/websockets/v3?app_id=22168';
 let ws;
 
 // بدء WebSocket
