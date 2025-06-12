@@ -8,7 +8,7 @@ const app = express();
 const accessList = JSON.parse(fs.readFileSync('access_list.json'));
 const userStates = {};
 
-const bot = new TelegramBot('7870976286:AAFdEkl8sIZBABUHY11LXFJ9zhR537BIqQs', { polling: true });
+const bot = new TelegramBot('7761232484:AAGXAcAZfN0cQtBFHrEu9JKfCVgiaxw-Xs8', { polling: true });
 
 // سيرفر لتشغيل البوت على UptimeRobot
 app.get('/', (req, res) => res.send('✅ Deriv bot is running'));
