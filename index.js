@@ -33,9 +33,7 @@ if (state.step === 'api') {
     state.running = false;
     bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
 }
-
 });
-
 bot.onText(//run/, (msg) => { const id = msg.chat.id; const user = userStates[id]; if (!user || user.running) return; user.running = true; bot.sendMessage(id, '🚀 تم بدء التشغيل...'); startBotForUser(id, user); });
 
 bot.onText(//stop/, (msg) => { const id = msg.chat.id; if (userStates[id]) { userStates[id].running = false; bot.sendMessage(id, '🛑 تم إيقاف البوت.'); } });
