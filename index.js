@@ -1,39 +1,56 @@
-const WebSocket = require('ws'); const TelegramBot = require('node-telegram-bot-api'); const axios = require('axios'); const fs = require('fs'); const express = require('express'); const app = express();
+const WebSocket = require('ws');
+const TelegramBot = require('node-telegram-bot-api');
+const axios = require('axios');
+const fs = require('fs');
+const express = require('express');
+const app = express();
 
-const accessList = JSON.parse(fs.readFileSync('access_list.json')); const userStates = {};
+const accessList = JSON.parse(fs.readFileSync('access_list.json'));
+const userStates = {};
 
 const bot = new TelegramBot('7870976286:AAFdEkl8sIZBABUHY11LXFJ9zhR537BIqQs', { polling: true });
 
-// سيرفر لتشغيل البوت على UptimeRobot app.get('/', (req, res) => res.send('✅ Deriv bot is running')); app.listen(3000, () => console.log('🌐 UptimeRobot is connected on port 3000'));
+// سيرفر لتشغيل البوت على UptimeRobot
+app.get('/', (req, res) => res.send('✅ Deriv bot is running'));
+app.listen(3000, () => console.log('🌐 UptimeRobot is connected on port 3000'));
 
-bot.onText(//start/, (msg) => { const id = msg.chat.id; if (!accessList.includes(id)) return bot.sendMessage(id, '❌ غير مصرح لك باستخدام هذا البوت.'); userStates[id] = { step: 'api' }; bot.sendMessage(id, '🔐 أرسل Deriv API Token الخاص بك:'); });
-
-bot.on('message', (msg) => { const id = msg.chat.id; const text = msg.text; const state = userStates[id];
-
-if (!state || !state.step || text.startsWith('/')) return;
-
-if (state.step === 'api') {
-    state.token = text;
-    state.step = 'stake';
-    bot.sendMessage(id, '💵 أرسل مبلغ الصفقة:');
-} else if (state.step === 'stake') {
-    state.stake = parseFloat(text);
-    state.step = 'tp';
-    bot.sendMessage(id, '🎯 أرسل الهدف (Take Profit):');
-} else if (state.step === 'tp') {
-    state.tp = parseFloat(text);
-    state.step = 'sl';
-    bot.sendMessage(id, '🛑 أرسل الحد الأقصى للخسارة (Stop Loss):');
-} else if (state.step === 'sl') {
-    state.sl = parseFloat(text);
-    state.profit = 0;
-    state.win = 0;
-    state.loss = 0;
-    state.currentStake = state.stake;
-    state.running = false;
-    bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
-}
+bot.onText(/\/start/, (msg) => {
+    const id = msg.chat.id;
+    if (!accessList.includes(id)) return bot.sendMessage(id, '❌ غير مصرح لك باستخدام هذا البوت.');
+    userStates[id] = { step: 'api' };
+    bot.sendMessage(id, '🔐 أرسل Deriv API Token الخاص بك:');
 });
+
+bot.on('message', (msg) => {
+    const id = msg.chat.id;
+    const text = msg.text;
+    const state = userStates[id];
+
+    if (!state || !state.step || text.startsWith('/')) return;
+
+    if (state.step === 'api') {
+        state.token = text;
+        state.step = 'stake';
+        bot.sendMessage(id, '💵 أرسل مبلغ الصفقة:');
+    } else if (state.step === 'stake') {
+        state.stake = parseFloat(text);
+        state.step = 'tp';
+        bot.sendMessage(id, '🎯 أرسل الهدف (Take Profit):');
+    } else if (state.step === 'tp') {
+        state.tp = parseFloat(text);
+        state.step = 'sl';
+        bot.sendMessage(id, '🛑 أرسل الحد الأقصى للخسارة (Stop Loss):');
+    } else if (state.step === 'sl') {
+        state.sl = parseFloat(text);
+        state.profit = 0;
+        state.win = 0;
+        state.loss = 0;
+        state.currentStake = state.stake;
+        state.running = false;
+        bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
+    }
+});
+
 bot.onText(//run/, (msg) => { const id = msg.chat.id; const user = userStates[id]; if (!user || user.running) return; user.running = true; bot.sendMessage(id, '🚀 تم بدء التشغيل...'); startBotForUser(id, user); });
 
 bot.onText(//stop/, (msg) => { const id = msg.chat.id; if (userStates[id]) { userStates[id].running = false; bot.sendMessage(id, '🛑 تم إيقاف البوت.'); } });
