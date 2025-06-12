@@ -51,48 +51,64 @@ bot.on('message', (msg) => {
     }
 });
 
-bot.onText(//run/, (msg) => { const id = msg.chat.id; const user = userStates[id]; if (!user || user.running) return; user.running = true; bot.sendMessage(id, '🚀 تم بدء التشغيل...'); startBotForUser(id, user); });
-
-bot.onText(//stop/, (msg) => { const id = msg.chat.id; if (userStates[id]) { userStates[id].running = false; bot.sendMessage(id, '🛑 تم إيقاف البوت.'); } });
-
-function startBotForUser(chatId, config) { const ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=22168');
-
-ws.on('open', () => {
-    ws.send(JSON.stringify({
-        ticks_history: 'R_100',
-        style: 'candles',
-        count: 600,
-        granularity: 60,
-        end: 'latest',
-        start: 1,
-        subscribe: 1
-    }));
+bot.onText(/\/run/, (msg) => {
+    const id = msg.chat.id;
+    const user = userStates[id];
+    if (!user || user.running) return;
+    user.running = true;
+    bot.sendMessage(id, '🚀 تم بدء التشغيل...');
+    startBotForUser(id, user);
 });
 
-let last10Minute = null;
-
-ws.on('message', async (data) => {
-    if (!config.running) return;
-    const msg = JSON.parse(data);
-    if (!msg.candles) return;
-
-    const candles = msg.candles;
-    const last = candles[candles.length - 1];
-    const currentMinute = new Date(last.epoch * 1000).getMinutes();
-
-    if (currentMinute % 10 === 0 && last10Minute !== last.epoch) {
-        last10Minute = last.epoch;
-        const dir = last.close > last.open ? 'CALL' : 'PUT';
-        await enterTrade(config, dir, chatId);
-
-        if (config.profit >= config.tp || config.profit <= -config.sl) {
-            bot.sendMessage(chatId, '🚫 تم الوصول إلى TP أو SL. تم إيقاف البوت.');
-            config.running = false;
-            ws.close();
-        }
+bot.onText(/\/stop/, (msg) => {
+    const id = msg.chat.id;
+    if (userStates[id]) {
+        userStates[id].running = false;
+        bot.sendMessage(id, '🛑 تم إيقاف البوت.');
     }
 });
 
+function startBotForUser(chatId, config) {
+    const ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=22168');
+
+    ws.on('open', () => {
+        ws.send(JSON.stringify({
+            ticks_history: 'R_100',
+            style: 'candles',
+            count: 600,
+            granularity: 60,
+            end: 'latest',
+            start: 1,
+            subscribe: 1
+        }));
+    });
+
+    let last10Minute = null;
+
+    ws.on('message', async (data) => {
+        if (!config.running) {
+            ws.close();
+            return;
+        }
+        const msg = JSON.parse(data);
+        if (!msg.candles) return;
+
+        const candles = msg.candles;
+        const last = candles[candles.length - 1];
+        const currentMinute = new Date(last.epoch * 1000).getMinutes();
+
+        if (currentMinute % 10 === 0 && last10Minute !== last.epoch) {
+            last10Minute = last.epoch;
+            const dir = last.close > last.open ? 'CALL' : 'PUT';
+            await enterTrade(config, dir, chatId);
+
+            if (config.profit >= config.tp || config.profit <= -config.sl) {
+                bot.sendMessage(chatId, '🚫 تم الوصول إلى TP أو SL. تم إيقاف البوت.');
+                config.running = false;
+                ws.close();
+            }
+        }
+    });
 }
 
 async function enterTrade(config, direction, chatId) { return new Promise((resolve) => { const ws = new WebSocket('wss://ws.derivapi.com/websockets/v3?app_id=22168');
