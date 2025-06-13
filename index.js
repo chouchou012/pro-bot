@@ -287,17 +287,22 @@ function startBotForUser(chatId, config) {
         delete userDerivConnections[chatId];
     });
 }
-// <--- بداية دالة enterTrade المعدلة (المناسبة مع الكود الحالي)
+// <--- بداية دالة enterTrade المصححة بالكامل
 // هذه الدالة ترسل طلب الاقتراح باستخدام اتصال WebSocket الموجود.
 // لا تقوم بإنشاء اتصال جديد أو معالجة الرسائل.
 async function enterTrade(config, direction, chatId, ws) {
     // التحقق من أن اتصال WebSocket نشط ومفتوح
     if (ws && ws.readyState === WebSocket.OPEN) {
-        console.log(`[Chat ID: ${chatId}] إرسال اقتراح لصفقة ${direction} بمبلغ ${config.currentStake}`);
+        // <--- هذا هو السطر الذي يضمن رقمين بعد الفاصلة
+        const formattedStake = parseFloat(config.currentStake.toFixed(2)); 
+
+        console.log(`[Chat ID: ${chatId}] إرسال اقتراح لصفقة ${direction} بمبلغ ${formattedStake}`); 
+
         // إرسال طلب الاقتراح (proposal) إلى Deriv API
+        // هذا هو المكان الوحيد الذي يجب أن يتم فيه إرسال طلب الاقتراح داخل هذه الدالة
         ws.send(JSON.stringify({
             "proposal": 1,
-            "amount": config.currentStake,
+            "amount": formattedStake, // <--- وهنا يتم استخدام المبلغ المنسق (formattedStake)
             "basis": "stake",
             "contract_type": direction, // 'CALL' أو 'PUT'
             "currency": "USD", // العملة (يمكن أن تكون متغيراً في config إذا أردت)
@@ -306,6 +311,7 @@ async function enterTrade(config, direction, chatId, ws) {
             "symbol": "R_100" // الأصل المالي (R_100)
         }));
     } else {
+        // هذا الجزء يتم تنفيذه إذا لم يكن اتصال WebSocket مفتوحاً
         console.error(`[Chat ID: ${chatId}] لا يمكن الدخول في الصفقة: اتصال WebSocket بـ Deriv غير نشط.`);
         bot.sendMessage(chatId, `❌ لا يمكن الدخول في الصفقة: الاتصال بـ Deriv غير نشط. يرجى إعادة تشغيل البوت إذا استمرت المشكلة.`);
         // يمكنك هنا اختيار إيقاف البوت إذا كان الاتصال غير نشط بشكل دائم:
@@ -313,4 +319,4 @@ async function enterTrade(config, direction, chatId, ws) {
         // if (ws) ws.close();
     }
 }
-// <--- نهاية دالة enterTrade المعدلة
+// <--- نهاية دالة enterTrade المصححة بالكامل
