@@ -242,7 +242,7 @@ function startBotForUser(chatId, config) {
                 config.currentStake = config.stake; // إعادة الـ stake الأصلي عند الربح
             } else {
                 config.loss++;
-                config.currentStake *= 2.2; // مضاعفة الـ stake عند الخسارة
+                config.currentStake *= 2.3; // مضاعفة الـ stake عند الخسارة
             }
 
             bot.sendMessage(chatId, `📊 نتيجة الصفقة: ${win ? '✅ ربح' : '❌ خسارة'}\n💰 الرصيد الآن: ${config.profit.toFixed(2)}$\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`);
