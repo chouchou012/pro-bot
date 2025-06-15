@@ -188,10 +188,15 @@ function startBotForUser(chatId, config) {
                         // هذه هي المرة الأولى التي يبدأ فيها البوت، أو بعد إعادة تشغيل،
                         // لا توجد شمعة سابقة للتحليل بعد.
                         bot.sendMessage(chatId, `⏳ جاري جمع بيانات الشمعة الأولى (10 دقائق). الرجاء الانتظار حتى بداية الشمعة التالية لتحديد الاتجاه.`);
+                        // في هذه الحالة، نسجل سعر الافتتاح للشمعة الحالية ونخرج لأننا لا ندخل صفقة بعد.
+                        config.candle10MinOpenPrice = currentTickPrice;
+                        config.lastProcessed10MinIntervalStart = current10MinIntervalStartMinute;
+                        console.log(`[Chat ID: ${chatId}] Initial 10-min candle started. Open Price: ${config.candle10MinOpenPrice.toFixed(3)} at ${currentMinute}:${currentSecond}`);
+                        return; // *هنا المكان الأول لـ return;* يوقف المعالجة لهذه الشمعة بعد تسجيل بياناتها الأولية.
                     }
 
-                    // محاولة الدخول في صفقة إذا تم تحديد اتجاه صالح والبوت يعمل
-                    if (tradeDirection !== 'none' && config.running) {
+                    // محاولة الدخول في صفقة إذا تم تحديد اتجاه صالح والبوت يعمل ولم يكن هناك دورة تداول نشطة
+                    if (tradeDirection !== 'none' && config.running && !config.tradingCycleActive) { // *أهم إضافة هنا: && !config.tradingCycleActive*
                         // إرسال رسالة لتوضيح ما إذا كانت صفقة أساسية أم مارتينغال
                         if (config.currentTradeCountInCycle > 0) {
                              bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ ${config.currentStake.toFixed(2)}$ بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
@@ -202,19 +207,25 @@ function startBotForUser(chatId, config) {
                         }
                         await enterTrade(config, tradeDirection, chatId, ws);
                         config.tradingCycleActive = true; // وضع علامة على أن دورة التداول نشطة
+
+                        // تحديث سعر الافتتاح لشمعة الـ 10 دقائق الجديدة التي بدأت للتو.
+                        config.candle10MinOpenPrice = currentTickPrice;
+                        config.lastProcessed10MinIntervalStart = current10MinIntervalStartMinute; // وضع علامة على أن هذه الفترة قد تمت معالجتها
+                        console.log(`[Chat ID: ${chatId}] New 10-min candle started. Open Price: ${config.candle10MinOpenPrice.toFixed(3)} at ${currentMinute}:${currentSecond}`);
+                        return; // *هنا المكان الثاني لـ return;* يوقف المعالجة بعد محاولة الدخول في صفقة.
                     } else if (config.candle10MinOpenPrice !== null) { // إذا لم يتم الدخول في صفقة وكان هناك شمعة سابقة
-                        console.log(`[Chat ID: ${chatId}] لا توجد صفقة: البوت غير فعال أو لا يوجد اتجاه واضح للشمعة السابقة.`);
+                        console.log(`[Chat ID: ${chatId}] لا توجد صفقة: البوت غير فعال أو لا يوجد اتجاه واضح للشمعة السابقة أو دورة تداول نشطة.`);
                         // إذا لم يتم الدخول في صفقة، أعد تعيين الحالة للاستعداد للشمعة الـ 10 دقائق التالية
                         config.tradingCycleActive = false; // مهم: إعادة تعيين إذا لم يتمكن من الدخول
                         config.currentStake = config.stake; // إعادة الستيك الأساسي إذا لم يتم الدخول في صفقة في هذه الدورة
                         config.currentTradeCountInCycle = 0; // إعادة تعيين العداد
-                    }
 
-                    // تحديث سعر الافتتاح لشمعة الـ 10 دقائق الجديدة التي بدأت للتو.
-                    // هذا السعر سيستخدم كـ "Open Price" للشمعة التالية التي ستكتمل بعد 10 دقائق.
-                    config.candle10MinOpenPrice = currentTickPrice;
-                    config.lastProcessed10MinIntervalStart = current10MinIntervalStartMinute; // وضع علامة على أن هذه الفترة قد تمت معالجتها
-                    console.log(`[Chat ID: ${chatId}] New 10-min candle started. Open Price: ${config.candle10MinOpenPrice.toFixed(3)} at ${currentMinute}:${currentSecond}`);
+                        // تحديث سعر الافتتاح لشمعة الـ 10 دقائق الجديدة التي بدأت للتو.
+                        config.candle10MinOpenPrice = currentTickPrice;
+                        config.lastProcessed10MinIntervalStart = current10MinIntervalStartMinute; // وضع علامة على أن هذه الفترة قد تمت معالجتها
+                        console.log(`[Chat ID: ${chatId}] New 10-min candle started. Open Price: ${config.candle10MinOpenPrice.toFixed(3)} at ${currentMinute}:${currentSecond}`);
+                        return; // *هنا المكان الثالث لـ return;* يوقف المعالجة بعد تحديث الحالة لعدم الدخول.
+                    }
                 }
             }
         }
