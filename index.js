@@ -52,19 +52,13 @@ delete userDerivConnections[id];
 
 
 
-userStates[id] = {
-
-step: 'api',
-
-// <--- تعديل جديد: إضافة خصائص جديدة لاستراتيجية التيكات
-
-priceAt9thMinuteStart: null, // لتخزين السعر عند بداية الدقيقة X9 (الثانية 00)
-
-minuteOfLastDecision: -1, // لتتبع الدقيقة X9 التي تم اتخاذ القرار بناءً عليها (لمنع التكرار)
-
-waitingForNextTrade: false // لتتبع ما إذا كنا في انتظار نهاية الدقيقة X9 (أول تيك من X0) للدخول
-
-};
+  userStates[id] = {
+      step: 'api',
+      // خصائص جديدة لاستراتيجية الشموع الكاملة
+      candle10MinOpenPrice: null, // لتخزين سعر الافتتاح لشمعة الـ 10 دقائق الحالية
+      lastProcessed10MinIntervalStart: -1, // لتتبع الدقيقة X0 التي تم معالجتها (لمنع التكرار)
+      tradingCycleActive: false // لتتبع ما إذا كانت هناك صفقة جارية أو دورة مارتينغال
+  };
 
 bot.sendMessage(id, '🔐 أرسل Deriv API Token الخاص بك:');
 
@@ -122,9 +116,13 @@ state.loss = 0;
 
 state.currentStake = state.stake;
 
-state.running = false; // للتأكد أنه غير قيد التشغيل بعد الإعداد
-
-bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
+    state.running = false; // للتأكد أنه غير قيد التشغيل بعد الإعداد
+    // إضافة بعض الحالات الأولية لضمان عدم وجود أخطاء عند بدء التشغيل
+    state.candle10MinOpenPrice = null;
+    state.lastProcessed10MinIntervalStart = -1;
+    state.tradingCycleActive = false;
+    state.currentTradeCountInCycle = 0; // إضافة لعداد المارتينغال
+    bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
 
 }
 
@@ -133,23 +131,27 @@ bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل الب�
 
 
 bot.onText(/\/run/, (msg) => {
+    const id = msg.chat.id;
+    const user = userStates[id];
+    if (!user || user.running) {
+        if (user && user.running) {
+            bot.sendMessage(id, '🔄 البوت قيد التشغيل بالفعل.');
+        } else {
+            bot.sendMessage(id, '⚠ الرجاء إعداد البوت أولاً باستخدام /start.');
+        }
+        return;
+    }
 
-const id = msg.chat.id;
+    user.running = true;
+    user.currentStake = user.stake; // إعادة تعيين الستيك الأساسي عند التشغيل
+    user.currentTradeCountInCycle = 0; // إعادة تعيين عداد المارتينغال
+    user.tradingCycleActive = false; // التأكد من عدم وجود دورة نشطة سابقة
+    user.candle10MinOpenPrice = null; // إعادة تعيين بيانات الشمعة
+    user.lastProcessed10MinIntervalStart = -1; // إعادة تعيين بيانات الشمعة
 
-const user = userStates[id];
-
-if (!user || user.running) return;
-
-
-
-user.running = true;
-
-bot.sendMessage(id, '🚀 تم بدء التشغيل...');
-
-startBotForUser(id, user); // استدعاء الدالة لبدء الاتصال بـ Deriv
-
+    bot.sendMessage(id, '🚀 تم بدء التشغيل...');
+    startBotForUser(id, user);
 });
-
 
 
 bot.onText(/\/stop/, (msg) => {
@@ -266,133 +268,75 @@ ws.send(JSON.stringify({
 
 // <--- تعديل جديد: كتلة معالجة التيكات الجديدة
 
+// *******************************************************************
+// ******* هذا هو الجزء المعدل لتحليل شمعة الـ 10 دقائق الكاملة *******
+// *******************************************************************
 else if (msg.msg_type === 'tick' && msg.tick) {
+    const currentTickPrice = parseFloat(msg.tick.quote);
+    const tickEpoch = msg.tick.epoch;
+    const tickDate = new Date(tickEpoch * 1000);
+    const currentMinute = tickDate.getMinutes();
+    const currentSecond = tickDate.getSeconds();
 
-const currentTickPrice = parseFloat(msg.tick.quote);
+    // تحديد بداية فترة الـ 10 دقائق الحالية (0, 10, 20, 30, 40, 50)
+    const current10MinIntervalStartMinute = Math.floor(currentMinute / 10) * 10;
 
-const tickEpoch = msg.tick.epoch;
+    // هذا الجزء يتم تشغيله فقط في الثانية 00 من الدقائق 0, 10, 20, 30, 40, 50
+    if (currentSecond === 0 && currentMinute === current10MinIntervalStartMinute) {
+        // التحقق مما إذا كانت هذه فترة 10 دقائق جديدة لم تتم معالجتها بعد
+        if (config.lastProcessed10MinIntervalStart !== current10MinIntervalStartMinute) {
+            let tradeDirection = 'none'; 
 
-const tickDate = new Date(tickEpoch * 1000);
+            // إذا كان لدينا سعر افتتاح للشمعة السابقة (ليست أول شمعة بعد تشغيل البوت)
+            if (config.candle10MinOpenPrice !== null) {
+                const previousCandleOpen = config.candle10MinOpenPrice;
+                const previousCandleClose = currentTickPrice; // سعر الإغلاق للشمعة السابقة هو التيك الحالي (سعر افتتاح الشمعة الجديدة)
 
-const currentMinute = tickDate.getMinutes();
+                if (previousCandleClose < previousCandleOpen) {
+                    tradeDirection = 'CALL'; // الشمعة السابقة كانت هابطة -> دخول صفقة شراء (CALL)
+                    bot.sendMessage(chatId, `📉 الشمعة السابقة (10 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
+                } else if (previousCandleClose > previousCandleOpen) {
+                    tradeDirection = 'PUT'; // الشمعة السابقة كانت صاعدة -> دخول صفقة بيع (PUT)
+                    bot.sendMessage(chatId, `📈 الشمعة السابقة (10 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
+                } else {
+                    bot.sendMessage(chatId, `↔ الشمعة السابقة (10 دقائق) بدون تغيير. لا يوجد اتجاه واضح.`);
+                }
+            } else {
+                // هذه هي أول شمعة 10 دقائق بعد تشغيل البوت، لا يوجد بيانات سابقة للتحليل.
+                bot.sendMessage(chatId, `⏳ جاري جمع بيانات الشمعة الأولى (10 دقائق). الرجاء الانتظار حتى بداية الشمعة التالية لتحديد الاتجاه.`);
+            }
 
-const currentSecond = tickDate.getSeconds();
+            // تحديث سعر الافتتاح للشمعة الجديدة (التيك الحالي هو سعر الافتتاح للشمعة التي بدأت للتو)
+            config.candle10MinOpenPrice = currentTickPrice;
+            // تحديث آخر فترة 10 دقائق تمت معالجتها
+            config.lastProcessed10MinIntervalStart = current10MinIntervalStartMinute; 
 
-
-
-// Log ticks for debugging (يمكن إزالتها لاحقاً إذا أردت)
-
-// console.log([Chat ID: ${chatId}] Tick: ${currentTickPrice} @ ${currentMinute}:${currentSecond});
-
-
-
-// --- الخطوة 1: تسجيل السعر في بداية الدقيقة X9 (أي عندما تكون الثانية 00) ---
-
-// هذا هو "سعر الافتتاح" للدقيقة التي سنحللها.
-
-if (currentSecond === 0 && (currentMinute % 10 === 9)) {
-
-// التحقق مما إذا كنا قد سجلنا هذا السعر بالفعل لهذه الدقيقة لمنع التكرار
-
-if (config.minuteOfLastDecision !== currentMinute) {
-
-config.priceAt9thMinuteStart = currentTickPrice;
-
-config.waitingForNextTrade = true; // نحن الآن ننتظر أول تيك من الدقيقة التالية
-
-console.log(`[Chat ID: ${chatId}] تم تسجيل سعر الافتتاح للدقيقة ${currentMinute}:00: ${currentTickPrice}`);
-
+            // محاولة الدخول في صفقة إذا تم استيفاء جميع الشروط
+            // (تم تحديد اتجاه، البوت يعمل، ولا توجد صفقة أو دورة مارتينغال جارية)
+            if (tradeDirection !== 'none' && config.running && !config.tradingCycleActive) { 
+                if (config.currentTradeCountInCycle > 0) {
+                     bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ <span class="math-inline">\{config\.currentStake\.toFixed\(2\)\}</span> بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
+                } else {
+                    bot.sendMessage(chatId, `✅ جاري الدخول في صفقة أساسية بمبلغ <span class="math-inline">\{config\.currentStake\.toFixed\(2\)\}</span> بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
+                }
+                await enterTrade(config, tradeDirection, chatId, ws);
+                config.tradingCycleActive = true; // وضع علامة على أن دورة التداول نشطة
+            } else {
+                // إذا لم يتم الدخول في صفقة (لأن tradingCycleActive TRUE أو no direction)
+                // ونحن في بداية شمعة جديدة وليست هناك صفقة جارية (tradingCycleActive FALSE)،
+                // نقوم بإعادة ضبط الستيك وعداد المارتينغال للاستعداد للدورة التالية.
+                if (!config.tradingCycleActive) { 
+                    config.currentStake = config.stake; 
+                    config.currentTradeCountInCycle = 0; 
+                }
+            }
+            return; // مهم: نخرج هنا بعد معالجة بداية الشمعة لمنع معالجة نفس الحدث مرة أخرى.
+        } 
+    }
 }
-
-}
-
-
-
-// --- الخطوة 2: تسجيل السعر في بداية الدقيقة X0 (أي عندما تكون الثانية 00) والدخول في الصفقة ---
-
-// هذا هو "سعر الإغلاق" للدقيقة X9 التي انتهت للتو.
-
-// يجب أن يحدث هذا بعد تسجيل priceAt9thMinuteStart من الدقيقة السابقة (X9).
-
-if (currentSecond === 0 && (currentMinute % 10 === 0) && config.waitingForNextTrade === true) {
-
-// تأكد أن الدقيقة الحالية هي بالفعل الدقيقة التالية للدقيقة X9 التي سجلنا سعر بدايتها
-
-const minuteBeforeCurrent = (currentMinute === 0) ? 59 : currentMinute - 1;
-
-if (minuteBeforeCurrent % 10 === 9 && config.minuteOfLastDecision !== minuteBeforeCurrent) {
-
-
-
-const priceAt0thMinuteStart = currentTickPrice; // هذا هو سعر الإغلاق للدقيقة X9
-
-
-
-let direction;
-
-if (config.priceAt9thMinuteStart !== null) { // تأكد أن لدينا سعر بداية
-
-if (priceAt0thMinuteStart > config.priceAt9thMinuteStart) {
-
-direction = 'CALL'; // السعر ارتفع خلال الدقيقة X9
-
-} else if (priceAt0thMinuteStart < config.priceAt9thMinuteStart) {
-
-direction = 'PUT'; // السعر انخفض خلال الدقيقة X9
-
-} else {
-
-// السعر لم يتغير، لا اتجاه واضح، لا ندخل صفقة
-
-console.log(`[Chat ID: ${chatId}] لا تغيير في السعر من ${minuteBeforeCurrent}:00 إلى ${currentMinute}:00. تخطي الصفقة.`);
-
-config.priceAt9thMinuteStart = null; // إعادة تعيين
-
-config.waitingForNextTrade = false; // إعادة تعيين
-
-config.minuteOfLastDecision = minuteBeforeCurrent; // تم معالجة هذه الدقيقة
-
-return;
-
-}
-
-
-
-console.log(`[Chat ID: ${chatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt9thMinuteStart}، سعر ${currentMinute}:00 هو ${priceAt0thMinuteStart}. الاتجاه: ${direction}`);
-
-
-
-if (config.running) {
-
-await enterTrade(config, direction, chatId, ws); // الدخول في صفقة مدتها دقيقة واحدة
-
-config.minuteOfLastDecision = minuteBeforeCurrent; // تسجيل الدقيقة التي تم اتخاذ القرار بناءً عليها
-
-} else {
-
-console.log(`[Chat ID: ${chatId}] البوت متوقف، لا يمكن دخول صفقة.`);
-
-}
-
-} else {
-
-console.log(`[Chat ID: ${chatId}] لا يوجد سعر بداية (X9:00) مسجل. تخطي الصفقة.`);
-
-}
-
-
-
-// إعادة تعيين المتغيرات استعداداً للدورة التالية
-
-config.priceAt9thMinuteStart = null;
-
-config.waitingForNextTrade = false;
-
-}
-
-}
-
-}
+// *******************************************************************
+// *********************** نهاية الجزء المعدل *************************
+// *******************************************************************
 
 // <--- نهاية كتلة معالجة التيكات الجديدة
 
@@ -406,13 +350,16 @@ else if (msg.msg_type === 'proposal') {
 
 // هنا يمكنك إرسال طلب الشراء 'buy'
 
-if (msg.error) {
-
-bot.sendMessage(chatId, `❌ فشل اقتراح الصفقة: ${msg.error.message}`);
-
-return;
-
-}
+    if (msg.error) {
+        bot.sendMessage(chatId, `❌ فشل اقتراح الصفقة: ${msg.error.message}`);
+        // في حالة فشل الاقتراح، نعتبرها خسارة ونطبق منطق المارتينغال
+        config.loss++; 
+        config.currentTradeCountInCycle++; 
+        config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2)); 
+        bot.sendMessage(chatId, `❌ فشل الاقتراح. جاري مضاعفة المبلغ إلى <span class="math-inline">\{config\.currentStake\.toFixed\(2\)\}</span> والانتظار للشمعة الـ 10 دقائق التالية.`);
+        config.tradingCycleActive = false; // إنهاء هذه المحاولة، والانتظار للشمعة التالية
+        return;
+    }
 
 const proposalId = msg.proposal.id;
 
@@ -434,13 +381,16 @@ else if (msg.msg_type === 'buy') {
 
 // هذه هي استجابة طلب الشراء
 
-if (msg.error) {
-
-bot.sendMessage(chatId, `❌ فشل شراء الصفقة: ${msg.error.message}`);
-
-return;
-
-}
+    if (msg.error) {
+        bot.sendMessage(chatId, `❌ فشل شراء الصفقة: ${msg.error.message}`);
+        // في حالة فشل الشراء، نعتبرها خسارة ونطبق منطق المارتينغال
+        config.loss++; 
+        config.currentTradeCountInCycle++; 
+        config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2)); 
+        bot.sendMessage(chatId, `❌ فشل الشراء. جاري مضاعفة المبلغ إلى <span class="math-inline">\{config\.currentStake\.toFixed\(2\)\}</span> والانتظار للشمعة الـ 10 دقائق التالية.`);
+        config.tradingCycleActive = false; 
+        return;
+    }
 
 const contractId = msg.buy.contract_id;
 
@@ -463,74 +413,61 @@ ws.send(JSON.stringify({
 }
 
 else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && msg.proposal_open_contract.is_sold === 1) {
+    const contract = msg.proposal_open_contract;
+    const profit = parseFloat(contract.profit);
+    const win = profit > 0;
 
-// هذه هي رسالة تحديث حالة العقد بعد بيعه
+    config.profit += profit; 
 
-const contract = msg.proposal_open_contract;
+    ws.send(JSON.stringify({ "forget": contract.contract_id }));
 
-const profit = parseFloat(contract.profit);
+    if (win) {
+        config.win++;
+        bot.sendMessage(chatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: <span class="math-inline">\{profit\.toFixed\(2\)\}</span>\n💰 الرصيد الكلي: <span class="math-inline">\{config\.profit\.toFixed\(2\)\}</span>\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 10 دقائق جديدة.`);
 
-const win = profit > 0;
+        config.tradingCycleActive = false; // إنهاء الدورة عند الربح
+        config.currentTradeCountInCycle = 0; // إعادة تعيين عداد المارتينغال
+        config.currentStake = config.stake; // إعادة الستيك الأساسي
+    } else { 
+        config.loss++;
+        config.currentTradeCountInCycle++; 
 
+        let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: <span class="math-inline">\{Math\.abs\(profit\)\.toFixed\(2\)\}</span>\n💰 الرصيد الكلي: <span class="math-inline">\{config\.profit\.toFixed\(2\)\}</span>\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
 
+        const maxMartingaleLosses = 5; // عدد صفقات المارتينغال المسموح بها قبل التوقف
 
-config.profit += profit;
+        if (config.currentTradeCountInCycle >= maxMartingaleLosses) { 
+            messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
+            bot.sendMessage(chatId, messageText);
+            config.running = false; 
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        } else {
+            config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
+            messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى <span class="math-inline">\{config\.currentStake\.toFixed\(2\)\}</span> والانتظار للشمعة الـ 10 الدقائق التالية لدخول صفقة.`;
+            bot.sendMessage(chatId, messageText);
+        }
+    }
 
-if (win) {
-
-config.win++;
-
-config.currentStake = config.stake; // إعادة الـ stake الأصلي عند الربح
-
-} else {
-
-config.loss++;
-
-config.currentStake *= 2.2; // مضاعفة الـ stake عند الخسارة
-
+    if (config.tp > 0 && config.profit >= config.tp) {
+        bot.sendMessage(chatId, `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: <span class="math-inline">\{config\.tp\.toFixed\(2\)\}</span>). تم إيقاف البوت تلقائياً.`);
+        config.running = false;
+        ws.close();
+    } else if (config.sl > 0 && config.profit <= -config.sl) {
+        bot.sendMessage(chatId, `🛑 عذراً! تم الوصول إلى حد الخسارة (SL: <span class="math-inline">\{config\.sl\.toFixed\(2\)\}</span>). تم إيقاف البوت تلقائياً.v`);
+        config.running = false;
+        ws.close();
+    }
 }
 
-
-
-bot.sendMessage(chatId, `📊 نتيجة الصفقة: ${win ? '✅ ربح' : '❌ خسارة'}\n💰 الرصيد الآن: ${config.profit.toFixed(2)}$\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`);
-
-// إلغاء الاشتراك من هذا العقد بعد بيعه
-
-ws.send(JSON.stringify({ "forget": contract.contract_id }));
-
-
-
-// <--- تعديل جديد: التحقق من TP/SL بعد كل صفقة
-
-if (config.profit >= config.tp && config.tp > 0) {
-
-bot.sendMessage(chatId, `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: ${config.tp.toFixed(2)}$). تم إيقاف البوت تلقائياً.`);
-
-config.running = false;
-
-ws.close();
-
-} else if (config.profit <= -config.sl && config.sl > 0) {
-
-bot.sendMessage(chatId, `🛑 عذراً! تم الوصول إلى حد الخسارة (SL: ${config.sl.toFixed(2)}$). تم إيقاف البوت تلقائياً.`);
-
-config.running = false;
-
-ws.close();
-
-}
-
-}
-
-else if (msg.msg_type === 'error') {
-
-// رسائل الخطأ العامة من Deriv API
-
-bot.sendMessage(chatId, `⚠ خطأ من Deriv API: ${msg.error.message}`);
-
-console.error(`Deriv API Error: ${JSON.stringify(msg.error)}`);
-
-}
+    else if (msg.msg_type === 'error') {
+        bot.sendMessage(chatId, `⚠ خطأ من Deriv API: ${msg.error.message}`);
+        // في حالة الخطأ، من الأفضل إعادة ضبط الحالة لضمان عدم دخول صفقات خاطئة
+        config.tradingCycleActive = false;
+        config.currentStake = config.stake;
+        config.currentTradeCountInCycle = 0;
+    }
 
 });
 
