@@ -59,6 +59,27 @@ function reconnectDeriv(chatId, config) {
         }
     }, 5000); // 5 ثوانٍ
 }
+// هذا هو الكود الذي يجب عليك إضافته إلى ملفك
+async function enterTrade(config, direction, chatId, ws) {
+    // التحقق مما إذا كان اتصال WebSocket نشطًا ومفتوحًا قبل إرسال الطلب
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const formattedStake = parseFloat(config.currentStake.toFixed(2));
+        bot.sendMessage(chatId, `⏳ جاري إرسال اقتراح لصفقة ${direction} بمبلغ ${formattedStake.toFixed(2)}$ ...`);
+        ws.send(JSON.stringify({
+            "proposal": 1,
+            "amount": formattedStake,
+            "basis": "stake",
+            "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
+            "currency": "USD",
+            "duration": 1,
+            "duration_unit": "m", // 1 دقيقة
+            "symbol": "R_100" // الرمز الذي تتداول عليه
+        }));
+    } else {
+        bot.sendMessage(chatId, `❌ لا يمكن الدخول في الصفقة: الاتصال بـ Deriv غير نشط. يرجى إعادة تشغيل البوت إذا استمرت المشكلة.`);
+        console.error(`[Chat ID: ${chatId}] لا يمكن الدخول في الصفقة: اتصال WebSocket بـ Deriv غير نشط.`);
+    }
+    }
 
 // دالة رئيسية لبدء تشغيل البوت لكل مستخدم
 function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتكون دالة عالمية
