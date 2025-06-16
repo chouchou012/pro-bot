@@ -175,7 +175,7 @@ function startBotForUser(chatId, config) {
                     config.previousMinuteDirection = config.lastMinuteDirection;
 
                     let prevMinForDisplay = currentMinute === 0 ? 59 : currentMinute - 1;
-                    bot.sendMessage(chatId, `📊 شمعة الدقيقة الماضية (${prevMinForDisplay} دقيقة): ${config.previousMinuteDirection} (فتح: ${config.previousMinuteOpenPrice.toFixed(3)}, إغلاق: ${config.previousMinuteClosePrice.toFixed(3)})`);
+
 
                     // ---------------------------------------------------
                     // التحقق من نمط الشمعة الابتلاعية هنا
@@ -185,21 +185,30 @@ function startBotForUser(chatId, config) {
                         let tradeDirection = 'none';
 
                         // شمعة ابتلاعية صاعدة (Bearish candle followed by a larger bullish candle that engulfs it)
-                        if (config.previousMinuteDirection === 'PUT' && config.lastMinuteDirection === 'CALL') {
-                            if (config.lastMinuteClosePrice > config.previousMinuteOpenPrice && config.lastMinuteOpenPrice < config.previousMinuteClosePrice) {
-                                isEngulfing = true;
-                                tradeDirection = 'CALL';
-                                bot.sendMessage(chatId, '🟢 تم اكتشاف شمعة ابتلاعية صاعدة! جاري الدخول في صفقة CALL.');
-                            }
-                        }
-                        // شمعة ابتلاعية هابطة (Bullish candle followed by a larger bearish candle that engulfs it)
-                        else if (config.previousMinuteDirection === 'CALL' && config.lastMinuteDirection === 'PUT') {
-                            if (config.lastMinuteClosePrice < config.previousMinuteOpenPrice && config.lastMinuteOpenPrice > config.previousMinuteClosePrice) {
-                                isEngulfing = true;
-                                tradeDirection = 'PUT';
-                                bot.sendMessage(chatId, '🔴 تم اكتشاف شمعة ابتلاعية هابطة! جاري الدخول في صفقة PUT.');
-                            }
-                        }
+                        // ... (جزء من الكود قبل الشروط)
+
+                                            // ---------------------------------------------------
+                                            // التحقق من نمط الشمعة الابتلاعية هنا
+                                            // ---------------------------------------------------
+                                            
+                                                // شمعة ابتلاعية صاعدة
+                                                if (config.previousMinuteDirection === 'PUT' && config.lastMinuteDirection === 'CALL') {
+                                                    if (config.lastMinuteClosePrice > config.previousMinuteOpenPrice) { // تم حذف الشرط الثاني
+                                                        isEngulfing = true;
+                                                        tradeDirection = 'CALL';
+                                                        bot.sendMessage(chatId, '🟢 تم اكتشاف شمعة ابتلاعية صاعدة! جاري الدخول في صفقة CALL.');
+                                                    }
+                                                }
+                                                // شمعة ابتلاعية هابطة
+                                                else if (config.previousMinuteDirection === 'CALL' && config.lastMinuteDirection === 'PUT') {
+                                                    if (config.lastMinuteClosePrice < config.previousMinuteOpenPrice) { // تم حذف الشرط الثاني
+                                                        isEngulfing = true;
+                                                        tradeDirection = 'PUT';
+                                                        bot.sendMessage(chatId, '🔴 تم اكتشاف شمعة ابتلاعية هابطة! جاري الدخول في صفقة PUT.');
+                                                    }
+                                                }
+
+                        // ... (بقية الكود)
 
                         if (isEngulfing && config.running && !config.tradingCycleActive) {
                             if (config.currentTradeCountInCycle > 0) {
@@ -331,7 +340,7 @@ function startBotForUser(chatId, config) {
             config.currentTradeCountInCycle = 0;
             saveUserStates(); // حفظ بعد خطأ من API
         }
-    }); // هذا القوس يغلق ws.on('message')
+            });// هذا القوس يغلق ws.on('message')
 
     ws.on('close', () => {
         console.log(`[Chat ID: ${chatId}] Deriv WebSocket connection closed.`);
