@@ -4,6 +4,7 @@ const fs = require('fs');
 const express = require('express');
 const app = express();
 
+// قائمة معرفات الدردشة المسموح بها (يتم قراءتها من الملف)
 // تأكد من وجود ملف access_list.json في نفس المجلد
 const accessList = JSON.parse(fs.readFileSync('access_list.json', 'utf8'));
 
@@ -12,7 +13,7 @@ let userStates = {};
 let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مستخدم
 
 // دالة لحفظ جميع حالات المستخدمين إلى ملف JSON
-function saveUserStates() { // <--- تم تصحيح الاسم: U كبيرة
+function saveUserStates() {
     try {
         fs.writeFileSync(USER_DATA_FILE, JSON.stringify(userStates, null, 2), 'utf8');
         // console.log('User states saved successfully.'); // يمكنك تفعيل هذا للتصحيح
@@ -22,7 +23,7 @@ function saveUserStates() { // <--- تم تصحيح الاسم: U كبيرة
 }
 
 // دالة لتحميل جميع حالات المستخدمين من ملف JSON عند بدء التشغيل
-function loadUserStates() { // <--- تم تصحيح الاسم: U كبيرة
+function loadUserStates() {
     try {
         if (fs.existsSync(USER_DATA_FILE)) {
             const data = fs.readFileSync(USER_DATA_FILE, 'utf8');
@@ -44,7 +45,7 @@ function reconnectDeriv(chatId, config) {
         return;
     }
 
-    console.log(`[Chat ID: ${chatId}] جاري محاولة إعادة الاتصال بـ Deriv في 5 ثوانٍ...`); // تم تعديل الوقت
+    console.log(`[Chat ID: ${chatId}] جاري محاولة إعادة الاتصال بـ Deriv في 5 ثوانٍ...`);
     bot.sendMessage(chatId, '🔄 جاري محاولة إعادة الاتصال بـ Deriv...');
 
     if (userDerivConnections[chatId]) {
@@ -59,7 +60,8 @@ function reconnectDeriv(chatId, config) {
         }
     }, 5000); // 5 ثوانٍ
 }
-// هذا هو الكود الذي يجب عليك إضافته إلى ملفك
+
+// دالة لدخول الصفقة
 async function enterTrade(config, direction, chatId, ws) {
     // التحقق مما إذا كان اتصال WebSocket نشطًا ومفتوحًا قبل إرسال الطلب
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -71,22 +73,40 @@ async function enterTrade(config, direction, chatId, ws) {
             "basis": "stake",
             "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
             "currency": "USD",
-            "duration": 1,
-            "duration_unit": "m", // 1 دقيقة
+            "duration": 60, // [تعديل]: 1 دقيقة
+            "duration_unit": "s", // الوحدة هي الثواني (seconds)
             "symbol": "R_100" // الرمز الذي تتداول عليه
         }));
     } else {
         bot.sendMessage(chatId, `❌ لا يمكن الدخول في الصفقة: الاتصال بـ Deriv غير نشط. يرجى إعادة تشغيل البوت إذا استمرت المشكلة.`);
         console.error(`[Chat ID: ${chatId}] لا يمكن الدخول في الصفقة: اتصال WebSocket بـ Deriv غير نشط.`);
     }
-    }
+}
 
 // دالة رئيسية لبدء تشغيل البوت لكل مستخدم
-function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتكون دالة عالمية
+function startBotForUser(chatId, config) {
     if (userDerivConnections[chatId]) {
         userDerivConnections[chatId].close();
         delete userDerivConnections[chatId];
     }
+
+    // تهيئة المتغيرات الخاصة بالشمعات وحالات التداول عند بدء تشغيل جديد
+    config.lastMinuteOpenPrice = null;
+    config.lastMinuteClosePrice = null;
+    config.lastMinuteDirection = 'none';
+    config.previousMinuteOpenPrice = null;
+    config.previousMinuteClosePrice = null;
+    config.previousMinuteDirection = 'none';
+    config.currentMinuteLastTickPrice = null;
+    config.lastProcessedMinute = -1; // هذا يضمن أن أول دقيقة جديدة ستُعالج
+
+    // إعادة ضبط الستيك وعداد المارتينغال عند بدء تشغيل جديد لدورة تداول جديدة
+    config.currentStake = config.stake;
+    config.currentTradeCountInCycle = 0;
+    config.tradingCycleActive = false; // تأكيد عدم وجود دورة تداول نشطة عند البدء
+    config.running = true; // تأكيد أن البوت أصبح قيد التشغيل
+
+    saveUserStates(); // حفظ حالة إعادة الضبط
 
     const ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=22168');
     userDerivConnections[chatId] = ws;
@@ -99,6 +119,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
     ws.on('message', async (data) => {
         const msg = JSON.parse(data);
 
+        // إذا كان البوت ليس قيد التشغيل، أغلق الاتصال وتوقف عن المعالجة
         if (!config.running) {
             if (ws.readyState === WebSocket.OPEN) {
                 ws.close();
@@ -114,7 +135,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 ws.close();
                 saveUserStates(); // حفظ الحالة بعد الفشل
             } else {
-                bot.sendMessage(chatId, `✅ تم تسجيل الدخول بنجاح! الرصيد: ${msg.authorize.balance} ${msg.authorize.currency}`);
+                bot.sendMessage(chatId, `✅ تم تسجيل الدخول بنجاح! الرصيد: ${msg.authorize.balance} ${msg.authorize.currency}\n⏳ جاري انتظار بداية شمعة دقيقة جديدة لبدء التحليل...`);
                 ws.send(JSON.stringify({
                     "ticks": "R_100",
                     "subscribe": 1
@@ -128,51 +149,83 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
             const currentMinute = tickDate.getMinutes();
             const currentSecond = tickDate.getSeconds();
 
-            const current10MinIntervalStartMinute = Math.floor(currentMinute / 10) * 10;
+            // دائماً قم بتحديث آخر سعر تيك تم استلامه في الدقيقة الحالية
+            config.currentMinuteLastTickPrice = currentTickPrice;
 
-            if (currentSecond === 0 && currentMinute === current10MinIntervalStartMinute) {
-                if (config.lastProcessed10MinIntervalStart !== current10MinIntervalStartMinute) {
-                    let tradeDirection = 'none';
+            // -----------------------------------------------------------
+            // منطق معالجة الشمعة 1 دقيقة (Engulfing Candle)
+            // -----------------------------------------------------------
 
-                    if (config.candle10MinOpenPrice !== null) {
-                        const previousCandleOpen = config.candle10MinOpenPrice;
-                        const previousCandleClose = currentTickPrice;
+            // عند بداية كل دقيقة جديدة (عندما تكون الثانية 0) وتكون هذه دقيقة جديدة بالفعل لم تتم معالجتها
+            if (currentSecond === 0 && config.lastProcessedMinute !== currentMinute) {
+                // أولاً، قم بمعالجة الشمعة السابقة (التي انتهت للتو عند الثانية 59)
+                if (config.lastMinuteOpenPrice !== null) {
+                    config.lastMinuteClosePrice = config.currentMinuteLastTickPrice;
 
-                        if (previousCandleClose < previousCandleOpen) {
-                            tradeDirection = 'CALL';
-                            bot.sendMessage(chatId, `📉 الشمعة السابقة (10 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
-                        } else if (previousCandleClose > previousCandleOpen) {
-                            tradeDirection = 'PUT';
-                            bot.sendMessage(chatId, `📈 الشمعة السابقة (10 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
-                        } else {
-                            bot.sendMessage(chatId, `↔ الشمعة السابقة (10 دقائق) بدون تغيير. لا يوجد اتجاه واضح.`);
-                        }
+                    if (config.lastMinuteClosePrice > config.lastMinuteOpenPrice) {
+                        config.lastMinuteDirection = 'CALL'; // صاعدة
+                    } else if (config.lastMinuteClosePrice < config.lastMinuteOpenPrice) {
+                        config.lastMinuteDirection = 'PUT'; // هابطة
                     } else {
-                        bot.sendMessage(chatId, `⏳ جاري جمع بيانات الشمعة الأولى (10 دقائق). الرجاء الانتظار حتى بداية الشمعة التالية لتحديد الاتجاه.`);
+                        config.lastMinuteDirection = 'none'; // بدون تغيير (دوجي)
                     }
 
-                    config.candle10MinOpenPrice = currentTickPrice;
-                    config.lastProcessed10MinIntervalStart = current10MinIntervalStartMinute;
-                    saveUserStates(); // حفظ بعد تحديث بيانات الشمعة
+                    config.previousMinuteOpenPrice = config.lastMinuteOpenPrice;
+                    config.previousMinuteClosePrice = config.lastMinuteClosePrice;
+                    config.previousMinuteDirection = config.lastMinuteDirection;
 
-                    if (tradeDirection !== 'none' && config.running && !config.tradingCycleActive) {
-                        if (config.currentTradeCountInCycle > 0) {
-                            bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
-                        } else {
-                            bot.sendMessage(chatId, `✅ جاري الدخول في صفقة أساسية بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
+                    let prevMinForDisplay = currentMinute === 0 ? 59 : currentMinute - 1;
+                    bot.sendMessage(chatId, `📊 شمعة الدقيقة الماضية (${prevMinForDisplay} دقيقة): ${config.previousMinuteDirection} (فتح: ${config.previousMinuteOpenPrice.toFixed(3)}, إغلاق: ${config.previousMinuteClosePrice.toFixed(3)})`);
+
+                    // ---------------------------------------------------
+                    // التحقق من نمط الشمعة الابتلاعية هنا
+                    // ---------------------------------------------------
+                    if (config.previousMinuteOpenPrice !== null && config.lastMinuteOpenPrice !== null) {
+                        let isEngulfing = false;
+                        let tradeDirection = 'none';
+
+                        // شمعة ابتلاعية صاعدة (Bearish candle followed by a larger bullish candle that engulfs it)
+                        if (config.previousMinuteDirection === 'PUT' && config.lastMinuteDirection === 'CALL') {
+                            if (config.lastMinuteClosePrice > config.previousMinuteOpenPrice && config.lastMinuteOpenPrice < config.previousMinuteClosePrice) {
+                                isEngulfing = true;
+                                tradeDirection = 'CALL';
+                                bot.sendMessage(chatId, '🟢 تم اكتشاف شمعة ابتلاعية صاعدة! جاري الدخول في صفقة CALL.');
+                            }
                         }
-                        await enterTrade(config, tradeDirection, chatId, ws);
-                        config.tradingCycleActive = true;
-                        saveUserStates(); // حفظ بعد بدء دورة التداول
-                    } else {
-                        if (!config.tradingCycleActive) {
-                            config.currentStake = config.stake;
-                            config.currentTradeCountInCycle = 0;
-                            saveUserStates(); // حفظ بعد إعادة ضبط الستيك والعداد
+                        // شمعة ابتلاعية هابطة (Bullish candle followed by a larger bearish candle that engulfs it)
+                        else if (config.previousMinuteDirection === 'CALL' && config.lastMinuteDirection === 'PUT') {
+                            if (config.lastMinuteClosePrice < config.previousMinuteOpenPrice && config.lastMinuteOpenPrice > config.previousMinuteClosePrice) {
+                                isEngulfing = true;
+                                tradeDirection = 'PUT';
+                                bot.sendMessage(chatId, '🔴 تم اكتشاف شمعة ابتلاعية هابطة! جاري الدخول في صفقة PUT.');
+                            }
+                        }
+
+                        if (isEngulfing && config.running && !config.tradingCycleActive) {
+                            if (config.currentTradeCountInCycle > 0) {
+                                bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ ${config.currentStake.toFixed(2)} بناءً على الشمعة الابتلاعية (${tradeDirection}).`);
+                            } else {
+                                bot.sendMessage(chatId, `✅ جاري الدخول في صفقة أساسية بمبلغ ${config.currentStake.toFixed(2)} بناءً على الشمعة الابتلاعية (${tradeDirection}).`);
+                            }
+                            await enterTrade(config, tradeDirection, chatId, ws);
+                            config.tradingCycleActive = true;
+                            saveUserStates();
+                        } else {
+                            // إذا لم يتم الدخول في صفقة، أعد ضبط الستيك وعداد المارتينغال إذا لم تكن دورة تداول نشطة
+                            if (!config.tradingCycleActive) {
+                                config.currentStake = config.stake;
+                                config.currentTradeCountInCycle = 0;
+                                saveUserStates();
+                            }
                         }
                     }
-                    return;
+                } else {
+                    bot.sendMessage(chatId, `⏳ جاري جمع بيانات الشمعة الأولى. الرجاء الانتظار حتى بداية الدقيقة التالية لتحديد الاتجاه.`);
                 }
+
+                config.lastMinuteOpenPrice = currentTickPrice;
+                config.lastProcessedMinute = currentMinute;
+                saveUserStates();
             }
         }
         else if (msg.msg_type === 'proposal') {
@@ -181,7 +234,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 config.loss++;
                 config.currentTradeCountInCycle++;
                 config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
-                bot.sendMessage(chatId, `❌ فشل الاقتراح. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الـ 10 دقائق التالية.`);
+                bot.sendMessage(chatId, `❌ فشل الاقتراح. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الدقيقة التالية.`);
                 config.tradingCycleActive = false;
                 saveUserStates(); // حفظ بعد فشل الاقتراح
                 return;
@@ -201,7 +254,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 config.loss++;
                 config.currentTradeCountInCycle++;
                 config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
-                bot.sendMessage(chatId, `❌ فشل الشراء. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الـ 10 دقائق التالية.`);
+                bot.sendMessage(chatId, `❌ فشل الشراء. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الدقيقة التالية.`);
                 config.tradingCycleActive = false;
                 saveUserStates(); // حفظ بعد فشل الشراء
                 return;
@@ -226,7 +279,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
 
             if (win) {
                 config.win++;
-                bot.sendMessage(chatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 10 دقائق جديدة.`);
+                bot.sendMessage(chatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة دقيقة جديدة.`);
                 config.tradingCycleActive = false;
                 config.currentTradeCountInCycle = 0;
                 config.currentStake = config.stake;
@@ -248,7 +301,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                     }
                 } else {
                     config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
-                    messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الـ 10 الدقائق التالية لدخول صفقة.`;
+                    messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الدقيقة التالية لدخول صفقة.`;
                     bot.sendMessage(chatId, messageText);
                 }
             }
@@ -278,7 +331,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
             config.currentTradeCountInCycle = 0;
             saveUserStates(); // حفظ بعد خطأ من API
         }
-    });
+    }); // هذا القوس يغلق ws.on('message')
 
     ws.on('close', () => {
         console.log(`[Chat ID: ${chatId}] Deriv WebSocket connection closed.`);
@@ -297,15 +350,12 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
         if (ws.readyState === WebSocket.OPEN) {
             ws.close();
         }
-        // لا حاجة لـ saveUserStates هنا لأن ws.on('close') ستُشغل
-    });
-} // <--- نهاية دالة startBotForUser
+        // لا يوجد كود إضافي هنا، هذا هو المكان الذي كان الكود يتكرر فيه خطأً
+    }); // هذا القوس يغلق ws.on('error')
+} // هذا القوس يغلق دالة startBotForUser بالكامل
 
 
-// -------------------------------------------------------------------------
-// أوامر تيليجرام
-// -------------------------------------------------------------------------
-
+// إنشاء بوت التيليجرام (تأكد من توكنك هنا)
 const bot = new TelegramBot('7761232484:AAGXAcAZfN0cQtBFHrEu9JKfCVgiaxw-Xs8', { polling: true }); // <--- تأكد من توكن التليجرام الخاص بك
 
 // UptimeRobot (لا علاقة لها بالبوت مباشرة، ولكن للحفاظ على تشغيل السيرفر)
@@ -313,6 +363,7 @@ app.get('/', (req, res) => res.send('✅ Deriv bot is running'));
 app.listen(3000, () => console.log('🌐 UptimeRobot is connected on port 3000'));
 
 
+// أمر /start: تهيئة المستخدم والإعدادات
 bot.onText(/\/start/, (msg) => {
     const id = msg.chat.id;
 
@@ -327,10 +378,16 @@ bot.onText(/\/start/, (msg) => {
 
     userStates[id] = {
         step: 'api',
-        candle10MinOpenPrice: null,
-        lastProcessed10MinIntervalStart: -1,
         tradingCycleActive: false,
         currentTradeCountInCycle: 0,
+        lastMinuteOpenPrice: null,
+        lastMinuteClosePrice: null,
+        lastMinuteDirection: 'none',
+        previousMinuteOpenPrice: null,
+        previousMinuteClosePrice: null,
+        previousMinuteDirection: 'none',
+        currentMinuteLastTickPrice: null,
+        lastProcessedMinute: -1,
         profit: 0, // تهيئة الربح
         win: 0,    // تهيئة عدد مرات الربح
         loss: 0,   // تهيئة عدد مرات الخسارة
@@ -345,6 +402,7 @@ bot.onText(/\/start/, (msg) => {
     bot.sendMessage(id, '🔐 أرسل Deriv API Token الخاص بك:');
 });
 
+// معالج الرسائل: يوجه المستخدم خلال عملية الإعداد (API, Stake, TP, SL)
 bot.on('message', (msg) => {
     const id = msg.chat.id;
     const text = msg.text;
@@ -371,9 +429,9 @@ bot.on('message', (msg) => {
         bot.sendMessage(id, '🛑 أرسل الحد الأقصى للخسارة (Stop Loss):');
     } else if (state.step === 'sl') {
         state.sl = parseFloat(text);
-        state.running = false;
-        state.candle10MinOpenPrice = null;
-        state.lastProcessed10MinIntervalStart = -1;
+        // لا داعي لتعيين state.running = false هنا، سيتم التعامل معها عند بدء التشغيل
+        state.candle10MinOpenPrice = null; // لم يعد مستخدماً في استراتيجية الدقيقة الواحدة، لكن أبقيته للسلامة
+        state.lastProcessed10MinIntervalStart = -1; // لم يعد مستخدماً
         state.tradingCycleActive = false;
         state.currentTradeCountInCycle = 0;
         // الأرباح والخسائر والستيك الحالي يتم تعيينها عند البدء أو في (/run)
@@ -383,6 +441,7 @@ bot.on('message', (msg) => {
     }
 });
 
+// أمر /run: تشغيل البوت وبدء الاتصال بـ Deriv
 bot.onText(/\/run/, (msg) => {
     const id = msg.chat.id;
     const user = userStates[id];
@@ -402,8 +461,6 @@ bot.onText(/\/run/, (msg) => {
     user.currentStake = user.stake; // إعادة تعيين الستيك الأساسي عند التشغيل
     user.currentTradeCountInCycle = 0; // إعادة تعيين عداد المارتينغال
     user.tradingCycleActive = false; // التأكد من عدم وجود دورة نشطة سابقة
-    user.candle10MinOpenPrice = null; // إعادة تعيين بيانات الشمعة
-    user.lastProcessed10MinIntervalStart = -1; // إعادة تعيين بيانات الشمعة
     user.profit = 0; // إعادة تعيين الأرباح
     user.win = 0;    // إعادة تعيين عدد مرات الربح
     user.loss = 0;   // إعادة تعيين عدد مرات الخسارة
@@ -413,6 +470,7 @@ bot.onText(/\/run/, (msg) => {
     startBotForUser(id, user); // استدعاء الدالة الصحيحة
 });
 
+// أمر /stop: إيقاف البوت وقطع الاتصال بـ Deriv
 bot.onText(/\/stop/, (msg) => {
     const id = msg.chat.id;
     if (userStates[id]) {
@@ -429,8 +487,6 @@ bot.onText(/\/stop/, (msg) => {
     }
 });
 
-
 // بدء البوت والاستماع للأوامر
-// لا داعي لـ bot.startPolling() هنا لأن { polling: true } في إنشاء الكائن يقوم بذلك.
 console.log('Bot started and waiting for commands...');
-loadUserStates(); // تحميل البيانات عند بدء تشغيل البوت
+loadUserStates();
