@@ -434,7 +434,7 @@ else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract
 
         let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: <span class="math-inline">\{Math\.abs\(profit\)\.toFixed\(2\)\}</span>\n💰 الرصيد الكلي: <span class="math-inline">\{config\.profit\.toFixed\(2\)\}</span>\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
 
-        const maxMartingaleLosses = 5; // عدد صفقات المارتينغال المسموح بها قبل التوقف
+        const maxMartingaleLosses = 4; // عدد صفقات المارتينغال المسموح بها قبل التوقف
 
         if (config.currentTradeCountInCycle >= maxMartingaleLosses) { 
             messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
@@ -449,7 +449,7 @@ else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract
             bot.sendMessage(chatId, messageText);
         }
     }
-
+    config.tradingCycleActive = false;
     if (config.tp > 0 && config.profit >= config.tp) {
         bot.sendMessage(chatId, `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: <span class="math-inline">\{config\.tp\.toFixed\(2\)\}</span>). تم إيقاف البوت تلقائياً.`);
         config.running = false;
