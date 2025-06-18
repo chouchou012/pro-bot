@@ -137,7 +137,7 @@ async function handleTradeResult(chatId, config, msg, ws) {
             config.currentTradeCountInCycle++; // زيادة عداد صفقات المارتينجال
 
             bot.sendMessage(chatId, `❌ خسارة! مبلغ الخسارة: ${Math.abs(profit_loss).toFixed(2)}$. الرصيد الحالي: ${config.balance.toFixed(2)}$`);
-            console.log(`[${chatId}] خسارة في الصفقة. الرصيد: ${config.balance.toFixed(2).`);
+            console.log(`[${chatId}] خسارة في الصفقة. الرصيد: ${config.balance.toFixed(2)}.`);
 
             // التحقق من تجاوز حد الخسارة (SL) أو أقصى عدد للمضاعفات
             // تأكد أن config.sl و config.maxMartingaleTrades معرفين ولديهما قيم صحيحة
