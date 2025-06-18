@@ -75,8 +75,8 @@ async function enterTrade(config, direction, chatId, ws) {
             "basis": "stake",
             "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
             "currency": "USD",
-            "duration": 1,
-            "duration_unit": "m", // 1 دقيقة
+            "duration": 57,
+            "duration_unit": "s", // 1 دقيقة
             "symbol": "R_100", // الرمز الذي تتداول عليه
             // لا نرسل TP/SL هنا، بل نعتمد على متابعتها في البوت
             // "take_profit": config.tp > 0 ? config.tp : undefined, 
