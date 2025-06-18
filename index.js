@@ -208,7 +208,7 @@ function startBotForUser(chatId, config, isReconnect = false) {
 
     // إضافة إعدادات المضاعفة الافتراضية إذا لم تكن موجودة
     config.martingaleFactor = config.martingaleFactor || 2.2;
-    config.maxMartingaleTrades = config.maxMartingaleTrades || 5; // الحد الأقصى للمضاعفات
+    config.maxMartingaleTrades = config.maxMartingaleTrades || 4; // الحد الأقصى للمضاعفات
 
     saveUserStates(); // حفظ حالة إعادة الضبط
 
