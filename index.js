@@ -119,7 +119,7 @@ async function handleTradeResult(chatId, config, msg, ws) {
         if (profit_loss > 0) { // إذا كانت الصفقة رابحة
             config.profit += profit_loss;
             config.win++;
-            bot.sendMessage(chatId, `✅ ربح! مبلغ الربح: ${profit_loss.toFixed(2)}$. الرصيد الحالي: ${config.balance.toFixed(2)}$`);
+            bot.sendMessage(chatId, `✅ ربح! مبلغ الربح: ${profit_loss.toFixed(2)}$. الرصيد الحالي: ${config.profit.toFixed(2)}$`);
 
             // إعادة تعيين الستيك وعداد المارتينجال ووقف الدورة لبدء دورة جديدة عند شمعة 10 دقائق جديدة
             config.currentStake = config.stake;
@@ -136,8 +136,8 @@ async function handleTradeResult(chatId, config, msg, ws) {
             config.loss++;
             config.currentTradeCountInCycle++; // زيادة عداد صفقات المارتينجال
 
-            bot.sendMessage(chatId, `❌ خسارة! مبلغ الخسارة: ${Math.abs(profit_loss).toFixed(2)}$. الرصيد الحالي: ${config.balance.toFixed(2)}$`);
-            console.log(`[${chatId}] خسارة في الصفقة. الرصيد: ${config.balance.toFixed(2)}.`);
+            bot.sendMessage(chatId, `❌ خسارة! مبلغ الخسارة: ${Math.abs(profit_loss).toFixed(2)}$. الرصيد الحالي: ${config.profit.toFixed(2)}$`);
+            console.log(`[${chatId}] خسارة في الصفقة. الرصيد: ${config.profit.toFixed(2)}.`);
 
             // التحقق من تجاوز حد الخسارة (SL) أو أقصى عدد للمضاعفات
             // تأكد أن config.sl و config.maxMartingaleTrades معرفين ولديهما قيم صحيحة
