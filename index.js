@@ -48,12 +48,14 @@ function reconnectDeriv(chatId, config) {
     bot.sendMessage(chatId, '🔄 جاري محاولة إعادة الاتصال بـ Deriv...');
 
     if (userDerivConnections[chatId]) {
+        userDerivConnections[chatId].close();
         delete userDerivConnections[chatId];
     }
 
     setTimeout(() => {
         if (config.running) {
-            startBotForUser(chatId, config);
+            // هنا نمرر 'true' لـ isReconnect لكي لا يتم إعادة ضبط المتغيرات
+            startBotForUser(chatId, config, true);
         } else {
             console.log(`[Chat ID: ${chatId}] البوت توقف أثناء فترة انتظار إعادة الاتصال.`);
         }
@@ -96,9 +98,23 @@ async function enterTrade(config, direction, chatId, ws) {
 async function handleTradeResult(chatId, config, msg, ws) {
     const contract = msg.proposal_open_contract;
 
+    // ************* تصحيح مشكلة NaN في الرصيد *************
+    // أضفنا هذه السطور لمساعدتك في Debugging، يمكنك إزالتها بعد التأكد من أن المشكلة حلت
+    console.log('Received contract message:', JSON.stringify(msg, null, 2));
+    console.log('balance_after_sell raw value:', contract.balance_after_sell);
+    // *****************************************************
+
     if (contract.is_sold === 1) { // الصفقة تم إغلاقها
         const profit_loss = parseFloat(contract.profit);
-        config.balance = parseFloat(contract.balance_after_sell); // تحديث الرصيد بعد البيع
+
+        // تأكد من أن contract.balance_after_sell هو قيمة صالحة قبل تحويله
+        if (typeof contract.balance_after_sell === 'number' || (typeof contract.balance_after_sell === 'string' && !isNaN(parseFloat(contract.balance_after_sell)))) {
+            config.balance = parseFloat(contract.balance_after_sell); // تحديث الرصيد بعد البيع
+        } else {
+            console.error(`[Chat ID: ${chatId}] قيمة balance_after_sell غير صالحة: ${contract.balance_after_sell}`);
+            // يمكن هنا إضافة منطق للتعامل مع هذا الخطأ، مثلاً جلب الرصيد مرة أخرى
+            // أو استخدام الرصيد السابق إذا كان متاحاً. حالياً، سنتجنب تعيين NaN.
+        }
 
         if (profit_loss > 0) { // إذا كانت الصفقة رابحة
             config.profit += profit_loss;
@@ -110,6 +126,7 @@ async function handleTradeResult(chatId, config, msg, ws) {
             config.currentTradeCountInCycle = 0;
             config.tradingCycleActive = false; // مهم جداً: إيقاف الدورة الحالية
             config.initialTradeDirectionForCycle = 'none'; // إعادة تعيين اتجاه الصفقة الأساسية للدورة
+            config.currentContractId = null; // إعادة تعيين ID العقد الحالي بعد انتهائه
             saveUserStates(); // حفظ حالة المستخدم بعد التغييرات
             bot.sendMessage(chatId, `💰 تم تحقيق ربح. البوت في وضع الانتظار لشمعة 10 دقائق جديدة.`);
             console.log(`[${chatId}] ربح في الصفقة. الرصيد: ${config.balance.toFixed(2)}. انتظار شمعة 10 دقائق جديدة.`);
@@ -133,6 +150,7 @@ async function handleTradeResult(chatId, config, msg, ws) {
                 config.currentTradeCountInCycle = 0;
                 config.tradingCycleActive = false; // إيقاف الدورة الحالية
                 config.initialTradeDirectionForCycle = 'none'; // إعادة تعيين اتجاه الصفقة الأساسية
+                config.currentContractId = null; // إعادة تعيين ID العقد الحالي بعد انتهائه
                 config.running = false; // إيقاف البوت تلقائياً عند الوصول للحد الأقصى
                 saveUserStates();
                 bot.sendMessage(chatId, `💰 البوت في وضع الانتظار لشمعة 10 دقائق جديدة.`);
@@ -158,7 +176,8 @@ async function handleTradeResult(chatId, config, msg, ws) {
 
 
 // دالة رئيسية لبدء تشغيل البوت لكل مستخدم
-function startBotForUser(chatId, config) {
+// إضافة isReconnect = false كبارامتر افتراضي
+function startBotForUser(chatId, config, isReconnect = false) {
     if (userDerivConnections[chatId]) {
         userDerivConnections[chatId].close();
         delete userDerivConnections[chatId];
@@ -167,13 +186,25 @@ function startBotForUser(chatId, config) {
     // تهيئة المتغيرات عند بدء التشغيل
     config.running = true; // تأكيد أن البوت أصبح قيد التشغيل
 
-    // إعادة ضبط الستيك وعداد المارتينجال عند بدء تشغيل جديد لدورة تداول جديدة
-    // هذه القيم يتم تهيئتها أيضاً في /run لضمان بداية نظيفة
-    config.currentStake = config.stake;
-    config.currentTradeCountInCycle = 0;
-    config.tradingCycleActive = false; // تأكيد عدم وجود دورة تداول نشطة عند البدء
-    config.initialTradeDirectionForCycle = 'none'; // إعادة تعيين الاتجاه الأساسي للدورة
-    config.currentContractId = null; // إعادة تعيين ID العقد الحالي
+    // ************ هذا هو التغيير الرئيسي ************
+    // هذه المتغيرات يتم إعادة ضبطها فقط إذا لم تكن عملية إعادة اتصال
+    if (!isReconnect) {
+        config.currentStake = config.stake;
+        config.currentTradeCountInCycle = 0;
+        config.tradingCycleActive = false; // تأكيد عدم وجود دورة تداول نشطة عند البدء
+        config.initialTradeDirectionForCycle = 'none'; // إعادة تعيين الاتجاه الأساسي للدورة
+        config.currentContractId = null; // إعادة تعيين ID العقد الحالي
+
+        // إعادة تعيين الأرباح والخسائر والعدادات عند بدء تشغيل جديد فقط (وليس عند إعادة الاتصال)
+        config.profit = 0;
+        config.win = 0;
+        config.loss = 0;
+
+        // إعادة تهيئة متغيرات شمعة الـ 10 دقائق والدورة لضمان بداية نظيفة
+        config.candle10MinOpenPrice = null;
+        config.lastProcessed10MinIntervalStart = -1;
+    }
+    // *************************************************
 
     // إضافة إعدادات المضاعفة الافتراضية إذا لم تكن موجودة
     config.martingaleFactor = config.martingaleFactor || 2.2;
@@ -214,6 +245,17 @@ function startBotForUser(chatId, config) {
                     "ticks": "R_100",
                     "subscribe": 1
                 }));
+
+                // **** إضافة جديدة هنا: إعادة الاشتراك في العقد المفتوح عند إعادة الاتصال ****
+                if (config.running && config.tradingCycleActive && config.currentContractId) {
+                    bot.sendMessage(chatId, `🔄 تم إعادة الاتصال. جاري متابعة العقد القديم: ${config.currentContractId}`);
+                    ws.send(JSON.stringify({
+                        "proposal_open_contract": 1,
+                        "contract_id": config.currentContractId,
+                        "subscribe": 1 // إعادة الاشتراك لتلقي تحديثات هذا العقد
+                    }));
+                }
+                // *******************************************************
             }
         }
         else if (msg.msg_type === 'tick' && msg.tick) {
@@ -294,6 +336,7 @@ function startBotForUser(chatId, config) {
                     config.currentTradeCountInCycle = 0;
                     config.tradingCycleActive = false;
                     config.initialTradeDirectionForCycle = 'none';
+                    config.currentContractId = null; // إعادة تعيين ID العقد الحالي بعد فشل الاقتراح
                     config.running = false; // إيقاف البوت تلقائياً عند الوصول للحد الأقصى
                     saveUserStates();
                 } else {
@@ -330,6 +373,7 @@ function startBotForUser(chatId, config) {
                     config.currentTradeCountInCycle = 0;
                     config.tradingCycleActive = false;
                     config.initialTradeDirectionForCycle = 'none';
+                    config.currentContractId = null; // إعادة تعيين ID العقد الحالي بعد فشل الشراء
                     config.running = false; // إيقاف البوت تلقائياً
                     saveUserStates();
                 } else {
@@ -366,6 +410,7 @@ function startBotForUser(chatId, config) {
             config.currentStake = config.stake;
             config.currentTradeCountInCycle = 0;
             config.initialTradeDirectionForCycle = 'none';
+            config.currentContractId = null; // إعادة تعيين ID العقد الحالي
             saveUserStates();
         }
     });
@@ -499,21 +544,8 @@ bot.onText(/\/run/, (msg) => {
         return;
     }
 
-    // إعادة تعيين بعض القيم عند بدء التشغيل لدورة جديدة
+    // هنا يتم استدعاء startBotForUser بدون بارامتر isReconnect، مما يعني أنه سيتم إعادة ضبط المتغيرات (دورة جديدة)
     user.running = true;
-    user.currentStake = user.stake; // إعادة تعيين الستيك الأساسي عند التشغيل
-    user.currentTradeCountInCycle = 0; // إعادة تعيين عداد المارتينغال
-    user.tradingCycleActive = false; // التأكد من عدم وجود دورة نشطة سابقة
-    user.profit = 0; // إعادة تعيين الأرباح
-    user.win = 0;    // إعادة تعيين عدد مرات الربح
-    user.loss = 0;   // إعادة تعيين عدد مرات الخسارة
-
-    // إعادة تهيئة متغيرات شمعة الـ 10 دقائق والدورة لضمان بداية نظيفة
-    user.candle10MinOpenPrice = null;
-    user.lastProcessed10MinIntervalStart = -1;
-    user.initialTradeDirectionForCycle = 'none'; // إعادة تعيين
-    user.currentContractId = null; // التأكد من عدم وجود عقد قديم
-
     saveUserStates(); // حفظ الحالة بعد بدء التشغيل
     bot.sendMessage(id, '🚀 تم بدء التشغيل...');
     startBotForUser(id, user); // استدعاء الدالة الصحيحة
