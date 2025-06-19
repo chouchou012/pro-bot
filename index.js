@@ -158,13 +158,13 @@ async function handleTradeResult(chatId, config, msg, ws) {
             } else {
                 // الاستمرار في المضاعفة: زيادة الستيك والدخول في صفقة فوراً بنفس الاتجاه
                 config.currentStake = parseFloat((config.currentStake * config.martingaleFactor).toFixed(2)); // تطبيق المارتينجال وتقريب المبلغ
-
+                const reverseDirection = config.initialTradeDirectionForCycle === 'CALL' ? 'PUT' : 'CALL';
                 bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مضاعفة رقم ${config.currentTradeCountInCycle} بمبلغ ${config.currentStake.toFixed(2)}$.`);
                 console.log(`[${chatId}] جاري الدخول في مضاعفة رقم ${config.currentTradeCountInCycle} باتجاه ${config.initialTradeDirectionForCycle} بمبلغ ${config.currentStake.toFixed(2)}.`);
 
                 // الدخول الفوري في صفقة مضاعفة بنفس اتجاه الصفقة الأساسية للدورة
                 // تأكد أن initialTradeDirectionForCycle تم تعيينه بشكل صحيح عند بدء الدورة
-                await enterTrade(config, config.initialTradeDirectionForCycle, chatId, ws);
+                await enterTrade(config, reverseDirection, chatId, ws); // استخدام reverseDirection
                 // tradingCycleActive يبقى true لأننا ما زلنا في نفس الدورة
                 saveUserStates(); // حفظ حالة المستخدم بعد التغييرات (الستيك والعداد)
             }
@@ -341,9 +341,10 @@ function startBotForUser(chatId, config, isReconnect = false) {
                     saveUserStates();
                 } else {
                     config.currentStake = parseFloat((config.currentStake * config.martingaleFactor).toFixed(2));
+                    const reverseDirection = config.initialTradeDirectionForCycle === 'CALL' ? 'PUT' : 'CALL';
                     bot.sendMessage(chatId, `❌ فشل الاقتراح. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)}$ والدخول فوراً.`);
                     // نستخدم initialTradeDirectionForCycle لأنه تم تحديده عند بدء الدورة
-                    await enterTrade(config, config.initialTradeDirectionForCycle, chatId, ws);
+                    await enterTrade(config, reverseDirection, chatId, ws); // استخدام reverseDirection
                     saveUserStates();
                 }
                 return;
@@ -378,9 +379,10 @@ function startBotForUser(chatId, config, isReconnect = false) {
                     saveUserStates();
                 } else {
                     config.currentStake = parseFloat((config.currentStake * config.martingaleFactor).toFixed(2));
+                    const reverseDirection = config.initialTradeDirectionForCycle === 'CALL' ? 'PUT' : 'CALL';
                     bot.sendMessage(chatId, `❌ فشل الشراء. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)}$ والدخول فوراً.`);
                     // نستخدم initialTradeDirectionForCycle لأنه تم تحديده عند بدء الدورة
-                    await enterTrade(config, config.initialTradeDirectionForCycle, chatId, ws);
+                    await enterTrade(config, reverseDirection, chatId, ws); // استخدام reverseDirection
                     saveUserStates();
                 }
                 return;
