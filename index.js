@@ -662,16 +662,16 @@ bot.on('message', (msg) => {
         // ***********************************************************************************
         // تم حذف الكود القديم هنا الذي كان ينتقل مباشرة إلى 'done_setup'
         // هذه المتغيرات سيتم ضبطها في خطوة 'take_profit' الجديدة أو عند تشغيل البوت
-        // state.running = false;
-        // state.tradingCycleActive = false;
-        // state.currentTradeCountInCycle = 0;
-        // state.initialTradeDirectionForCycle = 'none';
-        // state.currentContractId = null;
-        // state.outcomeDetermined = false;
-        // state.checkTimeForOutcome = null;
-        // state.currentContractEntrySpot = null;
-        // saveUserStates();
-        // bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
+        state.running = false;
+        state.tradingCycleActive = false;
+        state.currentTradeCountInCycle = 0;
+        state.initialTradeDirectionForCycle = 'none';
+        state.currentContractId = null;
+        state.outcomeDetermined = false;
+        state.checkTimeForOutcome = null;
+        state.currentContractEntrySpot = null;
+        saveUserStates();
+        bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
         state.step = 'done_setup'; // خطوة جديدة تدل على انتهاء الإعداد
     }
     // تم حذف كتل else if (state.step === 'tp') و else if (state.step === 'sl') بالكامل
