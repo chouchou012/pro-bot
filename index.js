@@ -671,8 +671,8 @@ bot.on('message', (msg) => {
         state.checkTimeForOutcome = null;
         state.currentContractEntrySpot = null;
         saveUserStates();
-        bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
         state.step = 'done_setup'; // خطوة جديدة تدل على انتهاء الإعداد
+        bot.sendMessage(id, '✅ تم الإعداد! أرسل /run لتشغيل البوت، /stop لإيقافه.');
     }
     // تم حذف كتل else if (state.step === 'tp') و else if (state.step === 'sl') بالكامل
     // *******************************************************************
