@@ -339,7 +339,7 @@ function startBotForUser(chatId, config) {
         // ----------------------------------------------------------------------
         // 🎯🎯🎯 هذا هو قسم معالجة رسائل 'history' المعدل 🎯🎯🎯
         // ----------------------------------------------------------------------
-        else if (msg.msg_type === 'history' && msg.history && msg.history.prices && msg.history.prices.length > 0 && config.currentOpenContract) {
+            else if (msg.msg_type === 'ticks_history' && msg.history && msg.history.prices && msg.history.prices.length > 0 && config.currentOpenContract) {
             // 🟢🟢🟢 DEBUG: تم استلام رسالة history 🟢🟢🟢
             console.log(`[Chat ID: ${currentChatId}] Debug: Received history message.`);
             console.log(`[Chat ID: ${currentChatId}] Debug: config.processingTradeResult before check: ${config.processingTradeResult}`);
