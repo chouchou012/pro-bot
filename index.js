@@ -249,7 +249,7 @@ function startBotForUser(chatId, config) {
                 "price": askPrice
             }));
         }
-                else if (msg.msg_type === 'buy') {
+        else if (msg.msg_type === 'buy') {
             if (msg.error) {
                 // ❌ معالجة فشل شراء الصفقة: نعتبرها خسارة ونمررها إلى handleTradeResult
                 console.error(`[Chat ID: ${currentChatId}] ❌ فشل شراء الصفقة: ${msg.error.message}`);
@@ -352,53 +352,63 @@ function startBotForUser(chatId, config) {
         // 4. تم إضافة bot.sendMessage لرسالة التنبؤ.
         // 5. تم تبسيط منطق else (إذا لم يتم استلام تيك صالح).
 
-        else if (msg.msg_type === 'history' && msg.history && msg.history.prices && msg.history.prices.length > 0 && config.currentOpenContract) {
-            // ⛔ مهم جداً: هذا العلم يمنع معالجة نفس النتيجة أكثر من مرة.
-            // يجب أن نتحقق من هذا أولاً.
-            if (config.processingTradeResult) {
-                console.log('[Chat ID: ${currentChatId}] تم استلام رسالة history ولكن النتيجة قيد المعالجة بالفعل، جاري التجاهل.');
-                return; // تجاهل إذا كنا بالفعل في عملية معالجة
+            else if (msg.msg_type === 'history' && msg.history && msg.history.prices && msg.history.prices.length > 0 && config.currentOpenContract) {
+                // ⛔ مهم جداً: هذا العلم يمنع معالجة نفس النتيجة أكثر من مرة.
+                // يجب أن نتحقق من هذا أولاً.
+                if (config.processingTradeResult) {
+                    console.log(`[Chat ID: ${currentChatId}] تم استلام رسالة history ولكن النتيجة قيد المعالجة بالفعل، جاري التجاهل.`);
+                    return; // تجاهل إذا كنا بالفعل في عملية معالجة
+                }
+                config.processingTradeResult = true; // نضبط العلم: الآن بدأنا في معالجة نتيجة الصفقة.
+
+                // 🗑 إلغاء مؤقت التنبؤ الخاص بالصفقة الحالية (للتأكد من عدم تشغيله مرة أخرى بالخطأ).
+                if (config.predictionCheckTimer) {
+                    clearTimeout(config.predictionCheckTimer);
+                    config.predictionCheckTimer = null;
+                }
+
+                const latestTickPrice = parseFloat(msg.history.prices[0]);
+                const contract = config.currentOpenContract;
+                let isWin = false;
+                let profit = 0;
+
+                // 🔴🔴🔴 إضافة تحقق إضافي هنا لضمان أن contract.entrySpot صالح
+                // (فقط في حال لم يتم تعيينه بشكل صحيح سابقاً - وهذا لا يجب أن يحدث بعد التعديلات)
+                if (isNaN(contract.entrySpot)) {
+                    console.error(`[Chat ID: ${currentChatId}] ❌ خطأ: contract.entrySpot غير صالح في قسم history!`);
+                    bot.sendMessage(currentChatId, `❌ خطأ داخلي: لا يمكن تحديد نتيجة الصفقة (سعر الدخول غير معروف).`);
+                    handleTradeResult(currentChatId, config, ws, { profit: -config.currentStake, win: false, internal_error: true });
+                    config.processingTradeResult = false;
+                    // لا نمسح currentOpenContract هنا، لأن handleTradeResult ستفعل ذلك في الحالات المناسبة
+                    return;
+                }
+
+
+                // حساب النتيجة بناءً على التنبؤ
+                if (contract.type === 'CALL') {
+                    isWin = latestTickPrice > contract.entrySpot;
+                } else if (contract.type === 'PUT') {
+                    isWin = latestTickPrice < contract.entrySpot;
+                }
+
+                if (isWin) {
+                    profit = config.currentStake * 0.95; // الربح المتوقع حوالي 95%
+                } else {
+                    profit = -config.currentStake; // خسارة كامل الستيك
+                }
+
+                console.log(`[Chat ID: ${currentChatId}] 🧠 تنبؤ بالنتيجة عند الثانية 58: ${isWin ? 'ربح' : 'خسارة'} بسعر ${latestTickPrice.toFixed(3)}. الربح/الخسارة: ${profit.toFixed(2)}`);
+                // 💬 إضافة رسالة تيليجرام هنا
+                bot.sendMessage(currentChatId, `🧠 تنبؤ عند الثانية 58: ${isWin ? '✅ ربح' : '❌ خسارة'}! ربح/خسارة: ${profit.toFixed(2)}`);
+
+                // ✨ معالجة النتيجة هنا (مثل رسالة is_sold)
+                // هذه الدالة (handleTradeResult) هي التي ستدخل المضاعفة فوراً إذا كانت خسارة
+                handleTradeResult(currentChatId, config, ws, { profit: profit, win: isWin });
+
+                config.processingTradeResult = false; // إعادة ضبط العلم
+                // 🔴🔴🔴 تم حذف السطر config.currentOpenContract = null; من هنا.
+                // سيتم مسحه الآن داخل handleTradeResult() في الأماكن المناسبة.
             }
-            config.processingTradeResult = true; // نضبط العلم: الآن بدأنا في معالجة نتيجة الصفقة.
-
-            // 🗑 إلغاء مؤقت التنبؤ الخاص بالصفقة الحالية (للتأكد من عدم تشغيله مرة أخرى بالخطأ).
-            if (config.predictionCheckTimer) { // تم التغيير هنا (predictionTimeout -> predictionCheckTimer)
-                clearTimeout(config.predictionCheckTimer); // تم التغيير هنا
-                config.predictionCheckTimer = null; // تم التغيير هنا
-            }
-
-            const latestTickPrice = parseFloat(msg.history.prices[0]);
-            // لاحظ تغيير config.currentContract إلى config.currentOpenContract
-            const contract = config.currentOpenContract; // تم التغيير هنا
-            let isWin = false;
-            let profit = 0;
-
-            // حساب النتيجة بناءً على التنبؤ
-            if (contract.type === 'CALL') {
-                isWin = latestTickPrice > contract.entrySpot;
-            } else if (contract.type === 'PUT') {
-                isWin = latestTickPrice < contract.entrySpot;
-            }
-
-            if (isWin) {
-                profit = config.currentStake * 0.95; // الربح المتوقع حوالي 95%
-            } else {
-                profit = -config.currentStake; // خسارة كامل الستيك
-            }
-
-            console.log(`[Chat ID: ${currentChatId}] 🧠 تنبؤ بالنتيجة عند الثانية 58: ${isWin ? 'ربح' : 'خسارة'} بسعر ${latestTickPrice.toFixed(3)}. الربح/الخسارة: ${profit.toFixed(2)}`);
-            // 💬 إضافة رسالة تيليجرام هنا
-            bot.sendMessage(currentChatId, `🧠 تنبؤ عند الثانية 58: ${isWin ? '✅ ربح' : '❌ خسارة'}! ربح/خسارة: ${profit.toFixed(2)}`);
-
-            // ✨ معالجة النتيجة هنا (مثل رسالة is_sold)
-            // هذه الدالة (handleTradeResult) هي التي ستدخل المضاعفة فوراً إذا كانت خسارة
-            handleTradeResult(currentChatId, config, ws, { profit: profit, win: isWin });
-
-            config.processingTradeResult = false; // إعادة ضبط العلم
-            // لاحظ تغيير config.currentContract إلى config.currentOpenContract
-            config.currentOpenContract = null; // إعادة ضبط العقد الحالي
-
-        }
         // ----------------------------------------------------------------------
         // 🎯🎯🎯 هذا هو القسم الثاني الذي يجب حذفه بالكامل 🎯🎯🎯
         // ----------------------------------------------------------------------
@@ -427,7 +437,7 @@ function startBotForUser(chatId, config) {
     // دالة مساعدة لمعالجة نتائج الصفقة (تم فصلها لتجنب التكرار)
     function handleTradeResult(currentChatId, config, ws, result) {
         const profit = result.profit;
-        const isWin = result.win;
+        const isWin = result.win; // 🎯 تم التأكيد على استخدام 'win' كـ 'isWin' من كودك السابق
 
         config.profit += profit;
 
@@ -442,7 +452,10 @@ function startBotForUser(chatId, config) {
             config.currentStake = config.stake; // العودة للستيك الأساسي
             config.baseTradeDirection = null; // إعادة ضبط الاتجاه الأساسي
             config.nextTradeDirection = null; // إعادة ضبط الاتجاه التالي
-        } else {
+
+            // 🎯 بعد الربح وإعادة تعيين كل شيء، يمكننا مسح العقد المفتوح
+            config.currentOpenContract = null; // 🎯 تم النقل إلى هنا (داخل دالة handleTradeResult)
+        } else { // حالة الخسارة
             config.loss++;
             config.currentTradeCountInCycle++; // زيادة عداد الخسائر المتتالية
 
@@ -454,6 +467,9 @@ function startBotForUser(chatId, config) {
                 bot.sendMessage(currentChatId, messageText);
                 config.running = false;
                 if (ws.readyState === WebSocket.OPEN) ws.close();
+
+                // 🎯 في حالة إيقاف البوت بعد الوصول للحد الأقصى، نمسح العقد المفتوح
+                config.currentOpenContract = null; // 🎯 تم النقل إلى هنا (داخل دالة handleTradeResult)
             } else {
                 config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2)); // مضاعفة الستيك
 
@@ -461,21 +477,23 @@ function startBotForUser(chatId, config) {
                 if (config.currentTradeCountInCycle === 1) { // إذا كانت هذه أول مضاعفة
                     config.nextTradeDirection = reverseDirection(config.baseTradeDirection);
                 }
-                // إذا كانت المضاعفات التالية، يبقى الاتجاه هو نفسه الذي تم تحديده في أول مضاعفة
+                // إذا كانت المضاعفات التالية، يبقى الاتجاه هو نفسه الذي تم تحديده في أول مضاعفة (لا يوجد تغيير هنا)
 
                 messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}. الصفقة التالية ستكون "${config.nextTradeDirection}".`;
                 console.log(`[Chat ID: ${currentChatId}] ❌ خسارة. جاري المضاعفة. الصفقة التالية: ${config.nextTradeDirection}`);
                 bot.sendMessage(currentChatId, messageText);
 
-                // *الدخول في الصفقة المضاعفة فوراً*
+                // الدخول في الصفقة المضاعفة فوراً
+                // هنا، لا نمسح config.currentOpenContract لأننا على وشك الدخول في صفقة جديدة
+                // وسيقوم قسم 'buy' بتحديث config.currentOpenContract بمعلومات الصفقة الجديدة.
                 setTimeout(() => {
                     if (config.running) {
                         enterTrade(config, config.nextTradeDirection, currentChatId, ws);
                     }
-                }, 1000); // 3 ثواني تأخير
+                }, 1000); // 1 ثانية تأخير 🎯 تم التعديل إلى 1000 مللي ثانية (كان 3000)
             }
         }
-        saveUserStates();
+        saveUserStates(); // حفظ الحالة بعد كل معالجة للنتيجة
 
         // فحص Take Profit / Stop Loss بعد كل صفقة
         if (config.tp > 0 && config.profit >= config.tp) {
@@ -484,31 +502,45 @@ function startBotForUser(chatId, config) {
             config.running = false;
             saveUserStates();
             if (ws.readyState === WebSocket.OPEN) ws.close();
+            // 🎯 في حالة إيقاف البوت بسبب TP، نمسح العقد المفتوح
+            config.currentOpenContract = null; // 🎯 تم النقل إلى هنا (داخل دالة handleTradeResult)
         } else if (config.sl > 0 && config.profit <= -config.sl) {
             console.log(`[Chat ID: ${currentChatId}] 🛑 وصل إلى حد الخسارة.`);
             bot.sendMessage(currentChatId, `🛑 عذراً! تم الوصول إلى حد الخسارة (SL: ${config.sl.toFixed(2)}). تم إيقاف البوت تلقائياً.`);
             config.running = false;
             saveUserStates();
             if (ws.readyState === WebSocket.OPEN) ws.close();
+            // 🎯 في حالة إيقاف البوت بسبب SL، نمسح العقد المفتوح
+            config.currentOpenContract = null; // 🎯 تم النقل إلى هنا (داخل دالة handleTradeResult)
         }
         // إعادة ضبط دورة التداول للسماح بالدخول في صفقة جديدة (فقط إذا لم يتم إيقاف البوت)
-        if (config.running) {
-            config.tradingCycleActive = false; 
+        // هذا الشرط ضروري لضمان عدم إعادة تعيين tradingCycleActive عندما تكون هناك مضاعفة جارية
+        // أو عندما يتوقف البوت.
+        if (config.running && isWin) { // 🎯 نعدلها لتكون فقط عند الربح
+            config.tradingCycleActive = false;
         }
+        // 🎯 لا نضع config.processingTradeResult = false; هنا في النهاية
+        // لأنها يجب أن يتم إعادتها إلى false في بداية 'history' block
+        // بعد التأكد من عدم وجود تداخلات (كما فعلت أنت بالفعل)
     }
 
-
+    // 🎯 هذا الجزء من الكود يجب أن يكون بعد دالة handleTradeResult()
     ws.on('close', (code, reason) => {
         const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
         console.log(`[Chat ID: ${chatId}] [${timestamp}] ❌ اتصال Deriv WebSocket مغلق. الكود: ${code}, السبب: ${reason.toString() || 'لا يوجد سبب محدد'}`);
 
         // مسح أي مؤقتات معلقة للتنبؤ عند إغلاق الاتصال
-        if (config.predictionTimeout) {
-            clearTimeout(config.predictionTimeout);
-            config.predictionTimeout = null;
+        // 🎯 ملاحظة: تأكد من أنك تستخدم predictionCheckTimer في مكان واحد فقط
+        if (config.predictionCheckTimer) { // 🎯 تم التغيير من predictionTimeout إلى predictionCheckTimer
+            clearTimeout(config.predictionCheckTimer); // 🎯 تم التغيير
+            config.predictionCheckTimer = null; // 🎯 تم التغيير
         }
         config.processingTradeResult = false;
-        config.currentContract = null;
+
+        // 🎯 قم بإزالة هذا السطر إذا كنت قد نقلت مسح currentOpenContract إلى handleTradeResult
+        // أو تأكد من أنه لا يتعارض مع المنطق الجديد
+        // config.currentContract = null; // ⚠ راجع هذا السطر: هل هو ضروري هنا؟
+                                       // الأفضل أن يتم مسح currentOpenContract فقط في handleTradeResult.
 
         if (config.running) {
             bot.sendMessage(chatId, '⚠ تم قطع الاتصال بـ Deriv. سأحاول إعادة الاتصال...');
@@ -530,9 +562,8 @@ function startBotForUser(chatId, config) {
         if (ws.readyState === WebSocket.OPEN) {
             ws.close();
         }
-    });
-} // <--- نهاية دالة startBotForUser
-
+    }); // <--- نهاية دالة startBotForUser
+    }
 
 // -------------------------------------------------------------------------
 // أوامر تيليجرام
