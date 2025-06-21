@@ -250,106 +250,98 @@ function startBotForUser(chatId, config) {
             }));
         }
                 else if (msg.msg_type === 'buy') {
-                    if (msg.error) {
-                        // ❌ معالجة فشل شراء الصفقة: نعتبرها خسارة ونمررها إلى handleTradeResult
-                        console.error(`[Chat ID: ${currentChatId}] ❌ فشل شراء الصفقة: ${msg.error.message}`);
-                        bot.sendMessage(currentChatId, `❌ فشل شراء الصفقة: ${msg.error.message}`);
-                        handleTradeResult(currentChatId, config, ws, { profit: -config.currentStake, win: false, buy_error: true });
-                        return; // مهم جداً: الخروج من الدالة بعد معالجة الخطأ لمنع استكمال باقي الكود في حالة الخطأ.
-                    } else {
-                        // ✅ تم شراء الصفقة بنجاح: هنا نبدأ عملية تتبع وتوقع النتيجة
+            if (msg.error) {
+                // ❌ معالجة فشل شراء الصفقة: نعتبرها خسارة ونمررها إلى handleTradeResult
+                console.error(`[Chat ID: ${currentChatId}] ❌ فشل شراء الصفقة: ${msg.error.message}`);
+                bot.sendMessage(currentChatId, `❌ فشل شراء الصفقة: ${msg.error.message}`);
+                handleTradeResult(currentChatId, config, ws, { profit: -config.currentStake, win: false, buy_error: true });
+                return; // مهم جداً: الخروج من الدالة بعد معالجة الخطأ لمنع استكمال باقي الكود في حالة الخطأ.
+            } else {
+                // ✅ تم شراء الصفقة بنجاح: هنا نبدأ عملية تتبع وتوقع النتيجة
 
-                        // استخراج المعلومات الأساسية من رسالة الشراء
-                        const contractId = msg.buy.contract_id;
-                        const entrySpot = msg.buy.buy_price; // سعر الدخول
-                        const contractType = msg.buy.contract_type; // نوع العقد (CALL/PUT)
+                // استخراج المعلومات الأساسية من رسالة الشراء
+                const contractId = msg.buy.contract_id;
+                const entrySpot = parseFloat(msg.buy.buy_price); // سعر الدخول
+                const contractType = msg.buy.contract_type; // نوع العقد (CALL/PUT)
 
-                        // 🎯 تم التعديل: استخدام parseFloat لضمان تحويل القيم إلى أرقام
-                        // إذا كانت القيمة من Deriv غير رقمية، ستصبح 'NaN'
-                        const duration = parseFloat(msg.buy.duration); 
-                        const entryTime = parseFloat(msg.buy.purchase_time); 
+                // 🎯🎯🎯 هذا هو الكود الجديد الذي يعتمد على الوقت المحلي (58 ثانية) 🎯🎯🎯
+                const currentLocalPurchaseTimeEpoch = Math.floor(Date.now() / 1000); // وقت الشراء بالثواني بناءً على توقيت البوت
+                const tradeDurationSeconds = 58; // الصفقة تنتهي عند الثانية 58 من وقت الشراء المحلي (بدلاً من 60)
+                const expiryTime = currentLocalPurchaseTimeEpoch + tradeDurationSeconds; // وقت الانتهاء المتوقع (epoch - ثواني)
 
-                        // 🎯 تم التعديل: إضافة تحقق حاسم: إذا كانت أي من القيمتين 'NaN'، فهناك مشكلة
-                        if (isNaN(duration) || isNaN(entryTime)) {
-                            console.error(`[Chat ID: ${currentChatId}] ❌ خطأ فادح في بيانات التوقيت من Deriv. purchase_time أو duration ليست أرقاماً صالحة.`);
-                            bot.sendMessage(currentChatId, `❌ خطأ في بيانات توقيت الصفقة من Deriv. لا يمكن تحديد وقت الانتهاء.`);
-                            // بما أن التوقيت غير صحيح، نعتبر الصفقة خسارة لمنع التعليق ونخرج.
-                            handleTradeResult(currentChatId, config, ws, { profit: -config.currentStake, win: false, internal_error: true });
-                            return; // الخروج من الدالة لمنع تنفيذ الكود المتبقي
-                        }
+                // 🎯 سطر Debug جديد، للتأكد من القيمة المحسوبة محلياً ونوعها
+                console.log(`[Chat ID: ${currentChatId}] Debug: Calculated Expiry Time (Local) = ${expiryTime}, Type: ${typeof expiryTime}`);
+                // 🎯🎯🎯 انتهاء الكود الجديد 🎯🎯🎯
 
-                        // الآن، بعد التأكد أن القيمتين أرقام، يمكننا إجراء عملية الجمع بأمان
-                        const expiryTime = entryTime + duration; // وقت الانتهاء المتوقع (epoch - ثواني)
+                // 1. تخزين تفاصيل العقد المفتوح حالياً في config.currentOpenContract
+                // expiryTime هنا ستكون القيمة التي حسبناها محلياً
+                config.currentOpenContract = {
+                    id: contractId,
+                    entrySpot: entrySpot, // تم تحويله إلى رقم عشري بالفعل أعلاه
+                    type: contractType, // نوع الصفقة (CALL أو PUT)
+                    expiryTime: expiryTime, // وقت انتهاء الصفقة بالثواني (epoch) - هذه هي القيمة الصحيحة الآن
+                    longcode: msg.buy.longcode // هذا السطر اختياري لكنه مفيد لتتبع العقد
+                };
 
-                        // 🎯 تم التعديل: سطر للمساعدة في تصحيح الأخطاء (Debug)
-                        // يجب أن ترى هنا رقمًا صالحًا ونوع 'number'
-                        console.log(`[Chat ID: ${currentChatId}] Debug: expiryTime = ${expiryTime}, Type: ${typeof expiryTime}`);
+                // رسائل تأكيد الدخول في الصفقة إلى الكونسول والتيليجرام
+                // 🎯 استخدام entrySpot مباشرة لأنه تم تحويله لـ parseFloat أعلاه
+                console.log(`[Chat ID: ${currentChatId}] 📥 تم الدخول صفقة بمبلغ ${config.currentStake.toFixed(2)}$ Contract ID: ${contractId}, Entry: ${entrySpot.toFixed(3)}, Expiry: ${new Date(expiryTime * 1000).toLocaleTimeString()}`);
+                bot.sendMessage(currentChatId, `📥 تم الدخول صفقة بمبلغ ${config.currentStake.toFixed(2)}$ Contract ID: ${contractId}\nسعر الدخول: ${entrySpot.toFixed(3)}\nينتهي في: ${new Date(expiryTime * 1000).toLocaleTimeString()}`);
 
-                        // 🎯 تم التعديل: تحقق أخير (يجب ألا يتم الوصول إليه إذا كان الكود يعمل بشكل صحيح)
-                        if (isNaN(expiryTime)) {
-                            console.error(`[Chat ID: ${currentChatId}] الخطأ: expiryTime أصبحت NaN بعد الجمع! (يجب ألا يحدث هذا بعد التحقق السابق)`);
-                            bot.sendMessage(currentChatId,` ⚠ خطأ منطقي داخلي في حساب توقيت الصفقة!`);
-                            handleTradeResult(currentChatId, config, ws, { profit: -config.currentStake, win: false, internal_error: true });
-                            return;
-                        }
+                // ⛔⛔⛔ ملاحظة مهمة جداً: لا يجب أن يكون هناك أي سطر هنا يقوم بـ "subscribe" على العقد المفتوح.
+                // أي سطر مثل: ws.send(JSON.stringify({ "proposal_open_contract": 1, "contract_id": contractId, "subscribe": 1 }));
+                // يجب أن يكون محذوفاً أو معلقاً تماماً، لأننا لم نعد نعتمد على رسائل is_sold الرسمية من Deriv.
 
-                        // 1. تخزين تفاصيل العقد المفتوح حالياً في config.currentOpenContract
-                        // expiryTime هنا ستكون قيمتها صحيحة الآن
-                        config.currentOpenContract = {
-                            id: contractId,
-                            entrySpot: parseFloat(entrySpot), // تأكد أنها رقم عشري (سعر)
-                            type: contractType, // نوع الصفقة (CALL أو PUT)
-                            expiryTime: expiryTime, // وقت انتهاء الصفقة بالثواني (epoch) - هذه هي القيمة الصحيحة الآن
-                            longcode: msg.buy.longcode // هذا السطر اختياري لكنه مفيد لتتبع العقد
-                        };
+                // 2. جدولة "إنذار" ليطلب آخر تيك عند الثانية 58 من دقيقة الصفقة
+                const nowEpoch = Math.floor(Date.now() / 1000); // الوقت الحالي بالثواني (epoch)
+                // نحسب الوقت المتبقي لطلب التيك. نريد الطلب قبل ثانيتين من نهاية الصفقة (أي عند الثانية 58).
+                // الآن config.currentOpenContract.expiryTime ستكون قيمة صحيحة، لذا timeToPredictSec ستحسب بشكل صحيح
+                // لاحظ: بما أن expiryTime نفسها مضبوطة على 58 ثانية، فإننا ببساطة ننتظر حتى يحين وقتها.
+                // ليس هناك حاجة لطرح 2 ثانية إضافية هنا، لأن expiryTime محسوبة لتكون لحظة التنبؤ.
+                const timeToPredictSec = config.currentOpenContract.expiryTime - nowEpoch;
 
-                        // رسائل تأكيد الدخول في الصفقة إلى الكونسول والتيليجرام
-                        // 🎯 تم التعديل: تأكد من استخدام parseFloat(entrySpot) هنا أيضاً لضمان التنسيق
-                        console.log(`[Chat ID: ${currentChatId}] 📥 تم الدخول صفقة بمبلغ ${config.currentStake.toFixed(2)}$ Contract ID: ${contractId}, Entry: ${parseFloat(entrySpot).toFixed(3)}, Expiry: ${new Date(expiryTime * 1000).toLocaleTimeString()}`);
-                        bot.sendMessage(currentChatId, `📥 تم الدخول صفقة بمبلغ ${config.currentStake.toFixed(2)}$ Contract ID: ${contractId}\nسعر الدخول: ${parseFloat(entrySpot).toFixed(3)}\nينتهي في: ${new Date(expiryTime * 1000).toLocaleTimeString()}`);
+                // نتحقق من أن هناك وقتاً كافياً لجدولة هذا الإنذار (يجب أن يكون timeToPredictSec أكبر من صفر)
+                if (timeToPredictSec > 0) {
+                    console.log(`[Chat ID: ${currentChatId}] جاري جدولة فحص التنبؤ (بعد ${timeToPredictSec} ثواني).`);
 
-                        // ⛔⛔⛔ ملاحظة مهمة جداً: لا يجب أن يكون هناك أي سطر هنا يقوم بـ "subscribe" على العقد المفتوح.
-                        // أي سطر مثل: ws.send(JSON.stringify({ "proposal_open_contract": 1, "contract_id": contractId, "subscribe": 1 }));
-                        // يجب أن يكون محذوفاً أو معلقاً تماماً، لأننا لم نعد نعتمد على رسائل is_sold الرسمية من Deriv.
-
-                        // 2. جدولة "إنذار" ليطلب آخر تيك عند الثانية 58 من دقيقة الصفقة
-                        const nowEpoch = Math.floor(Date.now() / 1000); // الوقت الحالي بالثواني (epoch)
-                        // الآن config.currentOpenContract.expiryTime ستكون قيمة صحيحة، لذا timeToPredictSec ستحسب بشكل صحيح
-                        const timeToPredictSec = (config.currentOpenContract.expiryTime - nowEpoch) - 2;
-
-                        // نتحقق من أن هناك وقتاً كافياً لجدولة هذا الإنذار (يجب أن يكون timeToPredictSec أكبر من صفر)
-                        if (timeToPredictSec > 0) {
-                            console.log(`[Chat ID: ${currentChatId}] جاري جدولة فحص التنبؤ عند الثانية 58 (بعد ${timeToPredictSec} ثواني).`);
-
-                            // ⚠ مهم جداً: إذا كان هناك مؤقت سابق نشط (من صفقة سابقة لم يتم إلغاؤها بشكل صحيح)، نلغيه.
-                            if (config.predictionCheckTimer) {
-                                clearTimeout(config.predictionCheckTimer);
-                                config.predictionCheckTimer = null; // 🎯 تم التأكيد على إفراغ المؤقت
-                            }
-
-                            config.predictionCheckTimer = setTimeout(async () => {
-                                if (config.running && config.currentOpenContract) {
-                                    console.log(`[Chat ID: ${currentChatId}] وصل المؤقت عند الثانية 58، جاري طلب آخر تيك لـ R_100 من Deriv...`);
-                                    ws.send(JSON.stringify({
-                                        "ticks_history": "R_100",
-                                        "end": "latest",
-                                        "count": 1,
-                                        "subscribe": 0
-                                    }));
-                                } else {
-                                    console.log(`[Chat ID: ${currentChatId}] تم إلغاء فحص التنبؤ عند الثانية 58: البوت غير فعال أو العقد غير موجود.`);
-                                }
-                            }, timeToPredictSec * 1000); // setTimeout يتطلب الوقت بالمللي ثانية
-                        } else {
-                            // 🎯 تم التعديل: هذه الكتلة لم يعد يجب أن يتم الوصول إليها إذا كانت expiryTime صالحة.
-                            // إذا تم الوصول إليها، فهذا يعني أن الصفقة قصيرة جداً (مثلاً، أقل من ثانيتين متبقية)
-                            // أو أن هناك مشكلة غير متوقعة في التوقيت.
-                            console.log(`[Chat ID: ${currentChatId}] وقت الصفقة قصير جداً للتنبؤ عند الثانية 58 (أو كان هناك خطأ في التوقيت). أعتبرها خسارة فورية.`);
-                            handleTradeResult(currentChatId, config, ws, { profit: -config.currentStake, win: false });
-                            config.currentOpenContract = null; // مسح معلومات العقد المفتوح بعد معالجته
-                        }
+                    // ⚠ مهم جداً: إذا كان هناك مؤقت سابق نشط (من صفقة سابقة لم يتم إلغاؤها بشكل صحيح)، نلغيه.
+                    if (config.predictionCheckTimer) {
+                        clearTimeout(config.predictionCheckTimer);
+                        config.predictionCheckTimer = null; // 🎯 تم التأكيد على إفراغ المؤقت
                     }
+
+                    // نقوم بضبط المؤقت (الإنذار) الذي سيقوم بطلب التيك في الوقت المحدد.
+                    // الكود داخل setTimeout سيتم تشغيله تلقائياً عندما يحين الوقت.
+                    config.predictionCheckTimer = setTimeout(async () => {
+                        // هذا الجزء من الكود يعمل فقط إذا كان البوت لا يزال فعالاً
+                        // وإذا كانت معلومات العقد الحالي لا تزال موجودة (لم يتم مسحها لسبب ما).
+                        if (config.running && config.currentOpenContract) {
+                            console.log(`[Chat ID: ${currentChatId}] وصل المؤقت، جاري طلب آخر تيك لـ R_100 من Deriv...`);
+
+                            // نرسل طلباً إلى Deriv للحصول على آخر سعر (تيك) لرمز R_100.
+                            // الرد على هذا الطلب سيأتي في رسالة 'history' وسيتم معالجته في قسم
+                            // else if (msg.msg_type === 'history')، والذي عدلناه مسبقاً.
+                            ws.send(JSON.stringify({
+                                "ticks_history": "R_100", // الرمز الذي نتداول عليه (يمكن استبداله بـ config.symbol إذا كان ديناميكياً)
+                                "end": "latest",     // نريد آخر تيك متاح
+                                "count": 1,          // نريد تيك واحد فقط
+                                "subscribe": 0       // لا نريد الاشتراك في التيكات، فقط هذا الطلب لمرة واحدة
+                            }));
+                        } else {
+                            // إذا لم يتم تلبية الشروط (البوت غير فعال أو العقد غير موجود)، نسجل ذلك.
+                            console.log(`[Chat ID: ${currentChatId}] تم إلغاء فحص التنبؤ: البوت غير فعال أو العقد غير موجود.`);
+                        }
+                    }, timeToPredictSec * 1000); // setTimeout يتطلب الوقت بالمللي ثانية، لذلك نضرب timeToPredictSec في 1000
+                } else {
+                    // هذه الحالة تحدث إذا كانت الصفقة قصيرة جداً (أقل من ثانية متبقية)
+                    // بناءً على طلبك بعدم انتظار أي شيء من Deriv، نعتبر هذه الصفقة خسارة فورية
+                    // وننتقل مباشرة للمضاعفة عبر handleTradeResult.
+                    console.log(`[Chat ID: ${currentChatId}] وقت الصفقة قصير جداً للتنبؤ. أعتبرها خسارة فورية.`);
+                    handleTradeResult(currentChatId, config, ws, { profit: -config.currentStake, win: false });
+                    config.currentOpenContract = null; // مسح معلومات العقد المفتوح بعد معالجته
                 }
+            }
+        }
     // ----------------------------------------------------------------------
         // 🎯🎯🎯 هذا هو القسم الأول المعدل (خاص بـ 'history') 🎯🎯🎯
         // ----------------------------------------------------------------------
