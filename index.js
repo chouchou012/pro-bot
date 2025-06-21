@@ -517,7 +517,7 @@ function startBotForUser(chatId, config) {
             config.currentOpenContract = null;
             config.tradingCycleActive = false; // 🎯 الدورة تنتهي هنا أيضاً
         }
-    
+        
 
     // 🎯 هذا الجزء من الكود يجب أن يكون بعد دالة handleTradeResult()
         ws.on('close', (code, reason) => {
@@ -544,7 +544,7 @@ function startBotForUser(chatId, config) {
                 saveUserStates();
             }
         });
-
+        
         ws.on('error', (error) => {
             const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
             console.error(`[Chat ID: ${chatId}] [${timestamp}] ❌ خطأ في اتصال Deriv WebSocket: ${error.message}`);
@@ -554,6 +554,7 @@ function startBotForUser(chatId, config) {
                 ws.close();
             }
         });
+        }
     }
 
 // -------------------------------------------------------------------------
@@ -718,7 +719,7 @@ bot.onText(/\/stop/, (msg) => {
         bot.sendMessage(id, '⚠ البوت ليس قيد التشغيل ليتم إيقافه.');
     }
 });
-    }
+    
 
 // بدء البوت والاستماع للأوامر
 console.log('Bot started and waiting for commands...');
