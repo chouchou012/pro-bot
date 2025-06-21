@@ -13,7 +13,7 @@ let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مس�
 
 // تعريف الثوابت للمضاعفات
 const MARTINGALE_FACTOR = 2.2;
-const MAX_MARTINGALE_TRADES = 1; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
+const MAX_MARTINGALE_TRADES = 4; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
 
 // دالة لحفظ جميع حالات المستخدمين إلى ملف JSON
 function saveUserStates() {
@@ -151,6 +151,7 @@ function startBotForUser(chatId, config) {
             const current10MinIntervalStartMinute = Math.floor(currentMinute / 10) * 10;
 
             // منطق تحديد اتجاه الصفقة الأساسية (فقط عند بداية شمعة الـ 10 دقائق)
+            // 🎯 هنا نتحقق من أن البوت يعمل وأننا لسنا في دورة تداول نشطة (أي لا توجد صفقة مفتوحة أو مضاعفة جارية).
             if (config.running && !config.tradingCycleActive) {
                 if (currentSecond === 0 && currentMinute === current10MinIntervalStartMinute) {
                     if (config.lastProcessed10MinIntervalStart !== current10MinIntervalStartMinute) {
@@ -187,8 +188,11 @@ function startBotForUser(chatId, config) {
                             config.baseTradeDirection = tradeDirection;
                             // الصفقة الأولى في دورة المارتينجال تكون بنفس الاتجاه المستنتج من الشمعة
                             config.nextTradeDirection = tradeDirection;
+
+                            // 🎯🎯🎯 هذا هو التعديل الأساسي هنا 🎯🎯🎯
+                            // نقوم باستدعاء enterTrade فقط هنا لبدء الصفقة الأولى للدورة.
                             await enterTrade(config, config.nextTradeDirection, currentChatId, ws);
-                            config.tradingCycleActive = true;
+                            config.tradingCycleActive = true; // الآن نحن في دورة تداول نشطة
                             saveUserStates();
                         } else {
                             // إذا لم يكن هناك اتجاه واضح، أعد ضبط الستيك والعداد
@@ -199,6 +203,8 @@ function startBotForUser(chatId, config) {
                     }
                 }
             }
+            // ⚠ مهم جداً: لا تضع أي منطق للدخول في صفقة هنا خارج الشرط !config.tradingCycleActive
+            // هذا يضمن أن الصفقات تبدأ فقط عند بداية الشمعة 10 دقائق (إذا لم تكن هناك صفقة جارية).
         }
         else if (msg.msg_type === 'proposal') {
             if (msg.error) {
