@@ -71,8 +71,12 @@ async function enterTrade(config, direction, chatId, ws) {
         const assumedEntrySpot = config.lastReceivedTickPrice; 
         // نفترض أن وقت الدخول هو وقتنا الحالي
         const assumedEntryTime = Math.floor(Date.now() / 1000); 
-        const tradeDurationSeconds = 58; // مدة الصفقة بالثواني
-        const assumedExpiryTime = assumedEntryTime + tradeDurationSeconds;
+        // 🔴🔴🔴 التعديل هنا: تحديد وقت الانتهاء ليكون عند الثانية 0 من الدقيقة التالية 🔴🔴🔴
+        const entryDate = new Date(assumedEntryTime * 1000);
+        entryDate.setSeconds(0, 0); // نضبط الثواني إلى 0
+        entryDate.setMinutes(entryDate.getMinutes() + 1); // ونزيد الدقيقة بواحد
+        const assumedExpiryTime = Math.floor(entryDate.getTime() / 1000);
+        // 🔴🔴🔴 نهاية التعديل 🔴🔴🔴
 
         if (assumedEntrySpot === null || isNaN(assumedEntrySpot)) {
             console.error(`[Chat ID: ${chatId}] ❌ لا يمكن الدخول في الصفقة: لم يتم استقبال أي تيك بعد أو قيمة التيك غير صالحة.`);
@@ -348,7 +352,7 @@ function startBotForUser(chatId, config) {
                                     }
 
                                     if (isWin) {
-                                        profit = config.currentStake * 0.95;
+                                        profit = config.currentStake * 0.89;
                                     } else {
                                         profit = -config.currentStake;
                                     }
