@@ -352,7 +352,7 @@ function startBotForUser(chatId, config) {
                                     }
 
                                     if (isWin) {
-                                        profit = config.currentStake * 0.89;
+                                        profit = config.currentStake * 0.88;
                                     } else {
                                         profit = -config.currentStake;
                                     }
