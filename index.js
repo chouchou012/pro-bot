@@ -467,7 +467,7 @@ function startBotForUser(chatId, config) {
                     if (config.running) {
                         enterTrade(config, config.nextTradeDirection, currentChatId, ws);
                     }
-                }, 1000);
+                }, 0);
             }
         }
         saveUserStates();
