@@ -463,11 +463,9 @@ function startBotForUser(chatId, config) {
                 bot.sendMessage(currentChatId, messageText);
 
                 config.currentOpenContract = null;
-               
-                    if (config.running) {
-                        enterTrade(config, config.nextTradeDirection, currentChatId, ws);
-                    }
-              
+               if (config.running) {
+                    enterTrade(config, config.nextTradeDirection, currentChatId, ws);
+                }
             }
         }
         saveUserStates();
