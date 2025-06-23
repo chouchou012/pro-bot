@@ -223,11 +223,11 @@ function startBotForUser(chatId, config) {
                             const previousCandleClose = currentTickPrice; 
 
                             if (previousCandleClose < previousCandleOpen) {
-                                tradeDirection = 'CALL'; // شمعة هابطة -> الصفقة التالية صعود
+                                tradeDirection = 'PUT'; // شمعة هابطة -> الصفقة التالية صعود
                                 console.log(`[Chat ID: ${currentChatId}] 📉 الشمعة السابقة (10 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                                 bot.sendMessage(currentChatId,` 📉 الشمعة السابقة (10 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                             } else if (previousCandleClose > previousCandleOpen) {
-                                tradeDirection = 'PUT'; // شمعة صاعدة -> الصفقة التالية هبوط
+                                tradeDirection = 'CALL'; // شمعة صاعدة -> الصفقة التالية هبوط
                                 console.log(`[Chat ID: ${currentChatId}] 📈 الشمعة السابقة (10 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                                 bot.sendMessage(currentChatId, `📈 الشمعة السابقة (10 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                             } else {
