@@ -199,7 +199,8 @@ function startBotForUser(chatId, config) {
                 const currentMinute = tickDate.getMinutes();
 
                 const currentSecond = tickDate.getSeconds();
-
+                    config.lastReceivedTickPrice = currentTickPrice;
+                    saveUserStates();
 
 
                 // Log ticks for debugging (يمكن إزالتها لاحقاً إذا أردت)
@@ -223,6 +224,7 @@ function startBotForUser(chatId, config) {
                 config.waitingForNextTrade = true; // نحن الآن ننتظر أول تيك من الدقيقة التالية
 
                 console.log(`[Chat ID: ${chatId}] تم تسجيل سعر الافتتاح للدقيقة ${currentMinute}:00: ${currentTickPrice}`);
+                    bot.sendMessage(chatId, `⏳ جاري تحليل شمعة الدقيقة ${currentMinute}:00. تسجيل سعر الافتتاح: ${currentTickPrice.toFixed(3)}`);
                     saveUserStates();
                 }
 
@@ -281,7 +283,7 @@ function startBotForUser(chatId, config) {
 
 
                 console.log(`[Chat ID: ${chatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt9thMinuteStart}، سعر ${currentMinute}:00 هو ${priceAt0thMinuteStart}. الاتجاه: ${direction}`);
-
+                    bot.sendMessage(chatId, `📊 تحليل الشمعة الأخيرة (${minuteBeforeCurrent}:00 -> ${currentMinute}:00):\nسعر البدء: ${config.priceAt9thMinuteStart.toFixed(3)}\nسعر الإغلاق: ${priceAt0thMinuteStart.toFixed(3)}\nالاتجاه المتوقع: ${direction}`);
 
 
                     // 🔴🔴🔴 هذا الجزء تم تعديله لدعم المضاعفات بشكل صحيح 🔴🔴🔴
