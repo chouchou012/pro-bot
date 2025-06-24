@@ -242,9 +242,9 @@ function startBotForUser(chatId, config) {
                                     let tradeDirection = 'none';
 
                                     if (priceAt0thMinuteStart < config.priceAt9thMinuteStart) {
-                                        tradeDirection = 'CALL'; // هبوط في الشمعة -> الصفقة التالية صعود
+                                        tradeDirection = 'PUT'; // هبوط في الشمعة -> الصفقة التالية صعود
                                     } else if (priceAt0thMinuteStart > config.priceAt9thMinuteStart) {
-                                        tradeDirection = 'PUT'; // صعود في الشمعة -> الصفقة التالية هبوط
+                                        tradeDirection = 'CALL'; // صعود في الشمعة -> الصفقة التالية هبوط
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
                                     }
