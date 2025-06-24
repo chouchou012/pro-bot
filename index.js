@@ -161,7 +161,7 @@ function startBotForUser(chatId, config) {
         const currentChatId = chatId;
 
         // 🟢🟢🟢 DEBUG: سجل نوع الرسالة الواردة (تم تفعيله لأغراض التصحيح) 🟢🟢🟢
-        console.log(`[Chat ID: ${currentChatId}] RECEIVED MSG TYPE: ${msg.msg_type}`);
+        
 
         // إذا توقف البوت، أغلق الاتصال وتجاهل الرسائل
         if (!config.running && ws.readyState === WebSocket.OPEN) {
@@ -201,17 +201,13 @@ function startBotForUser(chatId, config) {
                         // مما يعني أن 'lastReceivedTickPrice' قد لا يُحفظ في كل مرة إلا عند استدعاء 'saveUserStates()' في مكان آخر.
 
                         // 🟢🟢🟢 DEBUG: يمكنك تفعيل هذا لمراقبة التيكات 🟢🟢🟢
-                        console.log(`[Chat ID: ${currentChatId}] TICK: ${currentTickPrice.toFixed(3)} at ${tickDate.toLocaleTimeString()}`);
-                        console.log(`[Chat ID: ${currentChatId}] Current Minute: ${currentMinute}, Current Second: ${currentSecond}`);
-
                         // تم حذف: const current10MinIntervalStartMinute = Math.floor(currentMinute / 10) * 10;
                         // (لم يعد له صلة بمنطق التحليل الجديد)
 
                         // منطق تحديد اتجاه الصفقة الأساسية (تحليل آخر دقيقة: X9 -> X0)
                         if (config.running && !config.tradingCycleActive) {
                             // 🟢🟢🟢 DEBUG: جديد لمعرفة دخول الكتلة 🟢🟢🟢
-                            console.log(`[Chat ID: ${currentChatId}] DEBUG: دخلنا كتلة التحقق الرئيسية لتحليل آخر دقيقة.`);
-
+                           
                             // --- الخطوة 1: تسجيل السعر في بداية الدقيقة X9 (أو X4) ---
                             // (نقطة بدء تحليل "الشمعة" التي سندخل عليها صفقة عكسية)
                             // (يمكنك تغيير currentMinute % 10 === 9 إلى currentMinute % 5 === 4 إذا كنت تستهدف دورة 5 دقائق)
