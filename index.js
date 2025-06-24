@@ -13,7 +13,7 @@ let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مس�
 
 // تعريف الثوابت للمضاعفات
 const MARTINGALE_FACTOR = 2.2;
-const MAX_MARTINGALE_TRADES = 4; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
+const MAX_MARTINGALE_TRADES = 6; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
 
 // دالة لحفظ جميع حالات المستخدمين إلى ملف JSON
 function saveUserStates() {
@@ -109,8 +109,8 @@ async function enterTrade(config, direction, chatId, ws) {
             "basis": "stake",
             "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
             "currency": "USD",
-            "duration": 29,
-            "duration_unit": "t", // 1 دقيقة
+            "duration": 58,
+            "duration_unit": "s", // 1 دقيقة
             "symbol": "R_100" // الرمز الذي تتداول عليه
         }));
 
