@@ -13,7 +13,7 @@ let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مس�
 
 // تعريف الثوابت للمضاعفات
 const MARTINGALE_FACTOR = 2.2;
-const MAX_MARTINGALE_TRADES = 5; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
+const MAX_MARTINGALE_TRADES = 4; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
 
 // دالة لحفظ جميع حالات المستخدمين إلى ملف JSON
 function saveUserStates() {
@@ -57,9 +57,8 @@ function reconnectDeriv(chatId, config) {
         } else {
             console.log(`[Chat ID: ${chatId}] البوت توقف أثناء فترة انتظار إعادة الاتصال.`);
         }
-    }, 5000); // 5 ثوانٍ
+    }, 2000); // 5 ثوانٍ
 }
-
 
 async function enterTrade(config, direction, chatId, ws) {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -162,7 +161,6 @@ function startBotForUser(chatId, config) {
         const currentChatId = chatId;
 
         // 🟢🟢🟢 DEBUG: سجل نوع الرسالة الواردة (تم تفعيله لأغراض التصحيح) 🟢🟢🟢
-        console.log(`[Chat ID: ${currentChatId}] RECEIVED MSG TYPE: ${msg.msg_type}`);
 
         // إذا توقف البوت، أغلق الاتصال وتجاهل الرسائل
         if (!config.running && ws.readyState === WebSocket.OPEN) {
@@ -191,21 +189,22 @@ function startBotForUser(chatId, config) {
         }
                         else if (msg.msg_type === 'tick' && msg.tick) {
                             const currentTickPrice = parseFloat(msg.tick.quote);
-                            config.lastReceivedTickPrice = currentTickPrice;
                             const tickEpoch = msg.tick.epoch;
                             const tickDate = new Date(tickEpoch * 1000);
                             const currentMinute = tickDate.getMinutes();
                             const currentSecond = tickDate.getSeconds();
-
                             const current15MinIntervalStartMinute = Math.floor(currentMinute / 15) * 15;
+                            saveUserStates();
 
                             if (currentSecond === 0 && currentMinute === current15MinIntervalStartMinute) {
                                 if (config.lastProcessed15MinIntervalStart !== current15MinIntervalStartMinute) {
                                     let tradeDirection = 'none';
+                                    saveUserStates();
 
-                                    if (config.candle15MinOpenPrice !== null) {
+                                    if (config.candle10MinOpenPrice !== null) {
                                         const previousCandleOpen = config.candle15MinOpenPrice;
                                         const previousCandleClose = currentTickPrice;
+                                        saveUserStates();
 
                                         if (previousCandleClose < previousCandleOpen) {
                                             tradeDirection = 'CALL';
