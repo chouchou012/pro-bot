@@ -244,7 +244,7 @@ if (currentMinute % 15 === 14 && currentSecond >= 58 && config.waitingForCandleC
     await enterTrade(config, config.nextTradeDirection, currentChatId, ws);
   }, 2000); // 2000 مللي ثانية = 2 ثانية
 }
-      } else if (tradeDirection === 'none') {
+       else if (tradeDirection === 'none') {
         console.log(`[Chat ID: ${currentChatId}] ↔ لا يوجد تغيير في الشمعة. لا دخول في صفقة.`);
         bot.sendMessage(currentChatId, `↔ لا يوجد تغيير في الشمعة. لا دخول في صفقة.`);
         config.currentStake = config.stake;
