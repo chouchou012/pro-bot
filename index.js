@@ -498,7 +498,7 @@ function startBotForUser(chatId, config) {
 // أوامر تيليجرام
 // -------------------------------------------------------------------------
 
-const bot = new TelegramBot('8191363716:AAHeSIfvVma3RedOcyWx2sJ1DMrj-RPHtx8', { polling: true }); // <--- !!! استبدل هذا بتوكن التيليجرام الخاص بك !!!
+const bot = new TelegramBot('7748492830:AAEJ_9UVXFkq-u8SlFOrAXzbdsfsoo2IsW0', { polling: true }); // <--- !!! استبدل هذا بتوكن التيليجرام الخاص بك !!!
 
 // UptimeRobot (لا علاقة لها بالبوت مباشرة، ولكن للحفاظ على تشغيل السيرفر)
 const port = process.env.PORT || 3000;
