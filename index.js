@@ -187,81 +187,71 @@ function startBotForUser(chatId, config) {
                 }));
             }
         }
-                    else if (msg.msg_type === 'tick' && msg.tick) {
-  const currentTickPrice = parseFloat(msg.tick.quote);
-  const tickEpoch = msg.tick.epoch;
-  const tickDate = new Date(tickEpoch * 1000);
-  const currentMinute = tickDate.getMinutes();
-  const currentSecond = tickDate.getSeconds();
-
-  config.lastReceivedTickPrice = currentTickPrice;
-
-  if (config.running && !config.tradingCycleActive) {
-    const current15MinIntervalStartMinute = Math.floor(currentMinute / 15) * 15;
-
-    if (currentSecond === 0 && currentMinute === current15MinIntervalStartMinute) {
-      if (config.lastProcessed15MinIntervalStart !== current15MinIntervalStartMinute) {
-        config.candle15MinOpenPrice = currentTickPrice;
-        config.lastProcessed15MinIntervalStart = current15MinIntervalStartMinute;
-        config.waitingForCandleClose = true;
-        config.candleStartTime = tickEpoch;
-        saveUserStates();
-        console.log(`[Chat ID: ${currentChatId}] تم تسجيل سعر الافتتاح للشمعة 15 دقيقة: ${currentTickPrice.toFixed(3)}`);
-        bot.sendMessage(currentChatId, `⏳ جاري تحليل شمعة 15 دقيقة. تسجيل سعر الافتتاح: ${currentTickPrice.toFixed(3)}`);
-      } else if (config.lastProcessed15MinIntervalStart === current15MinIntervalStartMinute && config.candleStartTime !== null) {
-        // إذا كان البوت قد بدأ بالفعل في تحليل الشمعة
-      } else {
-        // إذا كان البوت لم يبدأ بعد في تحليل الشمعة، يجب أن ينتظر حتى بداية الشمعة الجديدة
-        config.lastProcessed15MinIntervalStart = null;
-        config.candleStartTime = null;
-      }
-    }
-
-   // تسجيل سعر الاغلاق
-if (currentMinute % 15 === 14 && currentSecond >= 58 && config.waitingForCandleClose === true) {
-      const candleClosePrice = currentTickPrice;
-      let tradeDirection = 'none';
-
-      if (candleClosePrice < config.candle15MinOpenPrice) {
-        tradeDirection = 'CALL';
-      } else if (candleClosePrice > config.candle15MinOpenPrice) {
-        tradeDirection = 'PUT';
-      } else {
-        tradeDirection = 'none';
-      }
-
-      console.log(`[Chat ID: ${currentChatId}] سعر الافتتاح: ${config.candle15MinOpenPrice.toFixed(3)}, سعر الإغلاق: ${candleClosePrice.toFixed(3)}. الاتجاه: ${tradeDirection}`);
-      bot.sendMessage(currentChatId, `📊 تحليل الشمعة 15 دقيقة:\nسعر الافتتاح: ${config.candle15MinOpenPrice.toFixed(3)}\nسعر الإغلاق: ${candleClosePrice.toFixed(3)}\nالاتجاه المتوقع: ${tradeDirection}`);
-
-      if (tradeDirection !== 'none' && !config.tradingCycleActive) {
-  setTimeout(async function() {
-    config.baseTradeDirection = tradeDirection;
-    config.nextTradeDirection = tradeDirection;
-    config.currentOpenContract = true;
-    config.tradingCycleActive = true;
-    saveUserStates();
-    console.log(`[Chat ID: ${currentChatId}] DEBUG: جاري الدخول في صفقة ${config.nextTradeDirection} بمبلغ ${config.currentStake.toFixed(2)}.`);
-    await enterTrade(config, config.nextTradeDirection, currentChatId, ws);
-  }, 2000); // 2000 مللي ثانية = 2 ثانية
-}
-       else if (tradeDirection === 'none') {
-        console.log(`[Chat ID: ${currentChatId}] ↔ لا يوجد تغيير في الشمعة. لا دخول في صفقة.`);
-        bot.sendMessage(currentChatId, `↔ لا يوجد تغيير في الشمعة. لا دخول في صفقة.`);
-        config.currentStake = config.stake;
-        config.currentTradeCountInCycle = 0;
-        config.tradingCycleActive = false;
-        config.baseTradeDirection = null;
-        config.nextTradeDirection = null;
-        saveUserStates();
-      }
-
-      config.waitingForCandleClose = false;
-      config.lastProcessed15MinIntervalStart = null;
-      config.candleStartTime = null;
-      saveUserStates();
-    }
-  }
-}
+         else if (msg.msg_type === 'tick' && msg.tick) { 
+          const currentTickPrice = parseFloat(msg.tick.quote); 
+          const tickEpoch = msg.tick.epoch; 
+          const tickDate = new Date(tickEpoch * 1000); 
+          const currentMinute = tickDate.getMinutes(); 
+          const currentSecond = tickDate.getSeconds(); 
+          config.lastReceivedTickPrice = currentTickPrice; 
+          if (config.running && !config.tradingCycleActive) { 
+            const current15MinIntervalStartMinute = Math.floor(currentMinute / 15) * 15; 
+            if (currentSecond === 0 && currentMinute === current15MinIntervalStartMinute) { 
+              if (config.lastProcessed15MinIntervalStart !== current15MinIntervalStartMinute) { 
+                if (!config.firstCandleClosed) {
+                  config.candle15MinOpenPrice = currentTickPrice;
+                  config.firstCandleClosed = true;
+                } else {
+                  config.candle15MinOpenPrice = config.candleClosePrice;
+                }
+                config.lastProcessed15MinIntervalStart = current15MinIntervalStartMinute; 
+                config.waitingForCandleClose = true; 
+                config.candleStartTime = tickEpoch; 
+                saveUserStates(); 
+                console.log(`[Chat ID: ${currentChatId}] تم تسجيل سعر الافتتاح للشمعة 15 دقيقة: ${config.candle15MinOpenPrice.toFixed(3)}`); 
+                bot.sendMessage(currentChatId, `⏳ جاري تحليل شمعة 15 دقيقة. تسجيل سعر الافتتاح: ${config.candle15MinOpenPrice.toFixed(3)}`); 
+              } 
+            } 
+            if (currentMinute % 15 === 14 && currentSecond >= 58 && config.waitingForCandleClose === true) { 
+              const candleClosePrice = currentTickPrice; 
+              config.candleClosePrice = candleClosePrice;
+              let tradeDirection = 'none'; 
+              if (candleClosePrice < config.candle15MinOpenPrice) { 
+                tradeDirection = 'PUT'; 
+              } else if (candleClosePrice > config.candle15MinOpenPrice) { 
+                tradeDirection = 'CALL'; 
+              } else { 
+                tradeDirection = 'none'; 
+              } 
+              console.log(`[Chat ID: ${currentChatId}] سعر الافتتاح: ${config.candle15MinOpenPrice.toFixed(3)}, سعر الإغلاق: ${candleClosePrice.toFixed(3)}. الاتجاه: ${tradeDirection}`); 
+              bot.sendMessage(currentChatId, `📊 تحليل الشمعة 15 دقيقة:\nسعر الافتتاح: ${config.candle15MinOpenPrice.toFixed(3)}\nسعر الإغلاق: ${candleClosePrice.toFixed(3)}\nالاتجاه المتوقع: ${tradeDirection}`); 
+              if (tradeDirection !== 'none' && !config.tradingCycleActive) { 
+                setTimeout(async function() { 
+                  config.baseTradeDirection = tradeDirection; 
+                  config.nextTradeDirection = tradeDirection; 
+                  config.currentOpenContract = true; 
+                  config.tradingCycleActive = true; 
+                  saveUserStates(); 
+                  console.log(`[Chat ID: ${currentChatId}] DEBUG: جاري الدخول في صفقة ${config.nextTradeDirection} بمبلغ ${config.currentStake.toFixed(2)}.`);
+                  await enterTrade(config, config.nextTradeDirection, currentChatId, ws); 
+                }, 2000); 
+              } else if (tradeDirection === 'none') { 
+                console.log(`[Chat ID: ${currentChatId}] ↔ لا يوجد تغيير في الشمعة. لا دخول في صفقة.`); 
+                bot.sendMessage(currentChatId, `↔ لا يوجد تغيير في الشمعة. لا دخول في صفقة.`); 
+                config.currentStake = config.stake; 
+                config.currentTradeCountInCycle = 0; 
+                config.tradingCycleActive = false; 
+                config.baseTradeDirection = null; 
+                config.nextTradeDirection = null; 
+                saveUserStates(); 
+              } 
+              config.waitingForCandleClose = false; 
+              config.lastProcessed15MinIntervalStart = null; 
+              config.candleStartTime = null; 
+              saveUserStates(); 
+            } 
+          } 
+        }
 
 
         else if (msg.msg_type === 'proposal') {
