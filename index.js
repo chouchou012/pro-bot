@@ -198,7 +198,7 @@ function startBotForUser(chatId, config) {
             const current15MinIntervalStartMinute = Math.floor(currentMinute / 15) * 15; 
             if (currentSecond === 0 && currentMinute === current15MinIntervalStartMinute) { 
               if (config.lastProcessed15MinIntervalStart !== current15MinIntervalStartMinute) { 
-                config.candle15MinOpenPrice = config.candleClosePrice || currentTickPrice;
+                config.candle15MinOpenPrice = config.candleClosePrice;
                 config.lastProcessed15MinIntervalStart = current15MinIntervalStartMinute; 
                 config.waitingForCandleClose = true; 
                 config.candleStartTime = tickEpoch; 
@@ -337,7 +337,7 @@ function startBotForUser(chatId, config) {
                                     }
 
                                     if (isWin) {
-                                        profit = config.currentStake * 0.89;
+                                        profit = config.currentStake * 0.88;
                                     } else {
                                         profit = -config.currentStake;
                                     }
