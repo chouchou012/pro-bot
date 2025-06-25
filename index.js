@@ -194,12 +194,10 @@ function startBotForUser(chatId, config) {
                             const currentMinute = tickDate.getMinutes();
                             const currentSecond = tickDate.getSeconds();
                             const current15MinIntervalStartMinute = Math.floor(currentMinute / 15) * 15;
-                            saveUserStates();
 
                             if (currentSecond === 0 && currentMinute === current15MinIntervalStartMinute) {
                                 if (config.lastProcessed15MinIntervalStart !== current15MinIntervalStartMinute) {
                                     let tradeDirection = 'none';
-                                    saveUserStates();
 
                                     if (config.candle10MinOpenPrice !== null) {
                                         const previousCandleOpen = config.candle15MinOpenPrice;
