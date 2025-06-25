@@ -217,7 +217,8 @@ function startBotForUser(chatId, config) {
       }
     }
 
-    if (currentMinute % 15 === 0 && currentSecond === 0 && config.waitingForCandleClose === true) {
+   // تسجيل سعر الاغلاق
+if (currentMinute % 15 === 14 && currentSecond === 59 && config.waitingForCandleClose === true) {
       const candleClosePrice = currentTickPrice;
       let tradeDirection = 'none';
 
