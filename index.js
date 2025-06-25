@@ -217,7 +217,7 @@ function startBotForUser(chatId, config) {
       }
     }
 
-    if (currentMinute % 15 === 14 && currentSecond >= 58 && config.waitingForCandleClose === true) {
+    if (currentMinute % 15 === 0 && currentSecond === 0 && config.waitingForCandleClose === true) {
       const candleClosePrice = currentTickPrice;
       let tradeDirection = 'none';
 
