@@ -202,7 +202,7 @@ function startBotForUser(chatId, config) {
                                 if (config.lastProcessed15MinIntervalStart !== current15MinIntervalStartMinute) {
                                     let tradeDirection = 'none';
 
-                                    if (config.candle10MinOpenPrice !== null) {
+                                    if (config.candle15MinOpenPrice !== null) {
                                         const previousCandleOpen = config.candle15MinOpenPrice;
                                         const previousCandleClose = currentTickPrice;
 
