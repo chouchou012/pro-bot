@@ -191,6 +191,7 @@ function startBotForUser(chatId, config) {
         }
                         else if (msg.msg_type === 'tick' && msg.tick) {
                             const currentTickPrice = parseFloat(msg.tick.quote);
+                            config.lastReceivedTickPrice = currentTickPrice;
                             const tickEpoch = msg.tick.epoch;
                             const tickDate = new Date(tickEpoch * 1000);
                             const currentMinute = tickDate.getMinutes();
