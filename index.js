@@ -187,7 +187,7 @@ function startBotForUser(chatId, config) {
                 }));
             }
         }
-         else if (msg.msg_type === 'tick' && msg.tick) { 
+        else if (msg.msg_type === 'tick' && msg.tick) { 
           const currentTickPrice = parseFloat(msg.tick.quote); 
           const tickEpoch = msg.tick.epoch; 
           const tickDate = new Date(tickEpoch * 1000); 
@@ -198,12 +198,7 @@ function startBotForUser(chatId, config) {
             const current15MinIntervalStartMinute = Math.floor(currentMinute / 15) * 15; 
             if (currentSecond === 0 && currentMinute === current15MinIntervalStartMinute) { 
               if (config.lastProcessed15MinIntervalStart !== current15MinIntervalStartMinute) { 
-                if (!config.firstCandleClosed) {
-                  config.candle15MinOpenPrice = currentTickPrice;
-                  config.firstCandleClosed = true;
-                } else {
-                  config.candle15MinOpenPrice = config.candleClosePrice;
-                }
+                config.candle15MinOpenPrice = config.candleClosePrice || currentTickPrice;
                 config.lastProcessed15MinIntervalStart = current15MinIntervalStartMinute; 
                 config.waitingForCandleClose = true; 
                 config.candleStartTime = tickEpoch; 
@@ -217,9 +212,9 @@ function startBotForUser(chatId, config) {
               config.candleClosePrice = candleClosePrice;
               let tradeDirection = 'none'; 
               if (candleClosePrice < config.candle15MinOpenPrice) { 
-                tradeDirection = 'PUT'; 
-              } else if (candleClosePrice > config.candle15MinOpenPrice) { 
                 tradeDirection = 'CALL'; 
+              } else if (candleClosePrice > config.candle15MinOpenPrice) { 
+                tradeDirection = 'PUT'; 
               } else { 
                 tradeDirection = 'none'; 
               } 
@@ -252,7 +247,6 @@ function startBotForUser(chatId, config) {
             } 
           } 
         }
-
 
         else if (msg.msg_type === 'proposal') {
             if (msg.error) {
