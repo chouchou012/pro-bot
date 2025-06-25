@@ -144,12 +144,13 @@ function startBotForUser(chatId, config) {
     config.currentOpenContract = null; // لتخزين تفاصيل العقد النشط
     config.predictionCheckTimer = null; // مؤقت التنبؤ
 
-    // لتخزين آخر تيك تم استقباله (مهم لتحديد نتيجة الصفقة)
+    config.previousCandleOpen = null;
+config.previousCandleClose = null;
     config.lastReceivedTickPrice = null;
     config.minuteOfLastDecision = null;
     config.candle15MinOpenPrice = null; // غيّر الاسم إلى 15 دقيقة هنا
     config.waitingForNextTrade = false;
-   
+   saveUserStates();
     ws.on('open', () => {
         console.log(`[Chat ID: ${chatId}] ✅ تم الاتصال بـ Deriv. جاري المصادقة...`);
         bot.sendMessage(chatId, '✅ تم الاتصال بـ Deriv. جاري المصادقة...');
@@ -189,10 +190,12 @@ function startBotForUser(chatId, config) {
         }
                         else if (msg.msg_type === 'tick' && msg.tick) {
                             const currentTickPrice = parseFloat(msg.tick.quote);
+                            config.lastReceivedTickPrice = currentTickPrice;
                             const tickEpoch = msg.tick.epoch;
                             const tickDate = new Date(tickEpoch * 1000);
                             const currentMinute = tickDate.getMinutes();
                             const currentSecond = tickDate.getSeconds();
+
                             const current15MinIntervalStartMinute = Math.floor(currentMinute / 15) * 15;
 
                             if (currentSecond === 0 && currentMinute === current15MinIntervalStartMinute) {
@@ -202,7 +205,6 @@ function startBotForUser(chatId, config) {
                                     if (config.candle10MinOpenPrice !== null) {
                                         const previousCandleOpen = config.candle15MinOpenPrice;
                                         const previousCandleClose = currentTickPrice;
-                                        saveUserStates();
 
                                         if (previousCandleClose < previousCandleOpen) {
                                             tradeDirection = 'CALL';
@@ -241,7 +243,6 @@ function startBotForUser(chatId, config) {
                                 }
                             }
                         }
-
 
         else if (msg.msg_type === 'proposal') {
             if (msg.error) {
