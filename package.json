@@ -1,24 +1,14 @@
 {
-  "name": "deriv-autotrader-bot",
+  "name": "deriv-bot",
   "version": "1.0.0",
-  "description": "Telegram bot for Deriv.com automated trading with Martingale strategy.",
+  "description": "A Deriv bot using Node.js and Telegram API",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [
-    "deriv",
-    "telegram",
-    "bot",
-    "autotrading",
-    "martingale",
-    "websocket"
-  ],
-  "author": "Your Name",
-  "license": "ISC",
   "dependencies": {
-    "express": "^4.19.2",
-    "node-telegram-bot-api": "^0.66.0",
-    "ws": "^8.17.1"
+    "express": "^4.17.1",
+    "node-telegram-bot-api": "^0.61.0",
+    "ws": "^8.10.0"
   }
 }
