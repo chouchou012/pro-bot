@@ -206,43 +206,40 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 "subscribe": 1
             }));
         }
-        else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && msg.proposal_open_contract.is_sold === 1) {
-            const contract = msg.proposal_open_contract;
-            const profit = parseFloat(contract.profit);
-            const win = profit > 0;
-
-            config.profit += profit;
-
-            ws.send(JSON.stringify({ "forget": contract.contract_id }));
-
-            if (win) {
-                config.win++;
-                bot.sendMessage(chatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 10 دقائق جديدة.`);
-                config.tradingCycleActive = false;
-                config.currentTradeCountInCycle = 0;
-                config.currentStake = config.stake;
+        else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && msg.proposal_open_contract.is_sold === 1) { 
+          const contract = msg.proposal_open_contract;
+          const profit = parseFloat(contract.profit);
+          const win = profit > 0;
+          config.profit += profit;
+          ws.send(JSON.stringify({ "forget": contract.contract_id }));
+          if (win) {
+            config.win++;
+            bot.sendMessage(chatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 10 دقائق جديدة.`);
+            config.tradingCycleActive = false;
+            config.currentTradeCountInCycle = 0;
+            config.currentStake = config.stake;
+          } else {
+            config.loss++;
+            config.currentTradeCountInCycle++;
+            let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
+            const maxMartingaleLosses = 4;
+            if (config.currentTradeCountInCycle >= maxMartingaleLosses) {
+              messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
+              bot.sendMessage(chatId, messageText);
+              config.running = false;
+              saveUserStates(); 
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.close();
+              }
             } else {
-                config.loss++;
-                config.currentTradeCountInCycle++;
-
-                let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
-
-                const maxMartingaleLosses = 4;
-
-                if (config.currentTradeCountInCycle >= maxMartingaleLosses) {
-                    messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
-                    bot.sendMessage(chatId, 'messageText');
-                    config.running = false;
-                    saveUserStates(); // حفظ الحالة عند الوصول للحد الأقصى للمارتينغال
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.close();
-                    }
-                } else {
-                    config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
-                    messageText += '\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)'};                    bot.sendMessage(chatId, 'messageText');
-                }
+              config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
+              messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}`;
+              bot.sendMessage(chatId, messageText);
             }
-            saveUserStates(); // حفظ بعد كل صفقة (ربح أو خسارة)
+          }
+          saveUserStates(); 
+            }
+       
 
             if (config.tp > 0 && config.profit >= config.tp) {
                 bot.sendMessage(chatId, `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: ${config.tp.toFixed(2)}). تم إيقاف البوت تلقائياً.`);
@@ -268,6 +265,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
             config.currentTradeCountInCycle = 0;
             saveUserStates(); // حفظ بعد خطأ من API
         }
+            
     });
 
     ws.on('close', () => {
