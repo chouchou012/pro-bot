@@ -175,13 +175,13 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                     }
                 }
             }
-       else if (msg.msg_type === 'proposal') { 
+ else if (msg.msg_type === 'proposal') { 
   if (msg.error) { 
-    bot.sendMessage(chatId, '❌ فشل اقتراح الصفقة: ${msg.error.message}');
+    bot.sendMessage(chatId, `❌ فشل اقتراح الصفقة: ${msg.error.message}`);
     config.loss++;
     config.currentTradeCountInCycle++;
     config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
-    bot.sendMessage(chatId, '❌ فشل الاقتراح. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)}.');
+    bot.sendMessage(chatId, `❌ فشل الاقتراح. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)}.`);
     config.tradingCycleActive = false;
     saveUserStates(); // حفظ بعد فشل الاقتراح
     // إزالة الجزء الذي يذكر انتظار الشمعة التالية
@@ -189,7 +189,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
   }
   const proposalId = msg.proposal.id;
   const askPrice = msg.proposal.ask_price;
-  bot.sendMessage(chatId, '✅ تم الاقتراح: السعر المطلوب ${askPrice.toFixed(2)}$. جاري الشراء...');
+  bot.sendMessage(chatId, `✅ تم الاقتراح: السعر المطلوب ${askPrice.toFixed(2)}$. جاري الشراء...`);
   ws.send(JSON.stringify({ "buy": proposalId, "price": askPrice }));
 }
         else if (msg.msg_type === 'buy') {
@@ -198,7 +198,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 config.loss++;
                 config.currentTradeCountInCycle++;
                 config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
-                bot.sendMessage(chatId, `❌ فشل الشراء. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الـ 10 دقائق التالية.`);
+                bot.sendMessage(chatId, `❌ فشل الشراء. جاري مضاعفة المبلغ إلى ${config.currentStake.toFixed(2)} والانتظار للشمعة الـ 5 دقائق التالية.`);
                 config.tradingCycleActive = false;
                 saveUserStates(); // حفظ بعد فشل الشراء
                 return;
@@ -212,49 +212,43 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 "subscribe": 1
             }));
         }
-else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && msg.proposal_open_contract.is_sold === 1) { 
-          const contract = msg.proposal_open_contract;
-          const profit = parseFloat(contract.profit);
-          const win = profit > 0;
-          config.profit += profit;
-          ws.send(JSON.stringify({ "forget": contract.contract_id }));
-          if (win) {
-            config.win++;
-            bot.sendMessage(chatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 5 دقائق جديدة.`);
-            config.tradingCycleActive = false;
-            config.currentTradeCountInCycle = 0;
-            config.currentStake = config.stake;
-          } else {
-            config.loss++;
-            config.currentTradeCountInCycle++; // زيادة عداد الخسائر المتتالية
+        else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && msg.proposal_open_contract.is_sold === 1) {
+            const contract = msg.proposal_open_contract;
+            const profit = parseFloat(contract.profit);
+            const win = profit > 0;
 
-            let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
-              const MARTINGALE_FACTOR = 2.2;
-              const MAX_MARTINGALE_TRADES = 4;
-            if (config.currentTradeCountInCycle > MAX_MARTINGALE_TRADES) {
-                messageText += `\n🛑 تم الوصول إلى الحد الأقصى للمضاعفات (${MAX_MARTINGALE_TRADES} مرات خسارة متتالية). تم إيقاف البوت تلقائياً.`;
-                console.log(`[Chat ID: ${currentChatId}] 🛑 وصل إلى الحد الأقصى للمضاعفات.`);
-                bot.sendMessage(currentChatId, messageText);
-                config.running = false;
-                if (ws.readyState === WebSocket.OPEN) ws.close();
+            config.profit += profit;
+
+            ws.send(JSON.stringify({ "forget": contract.contract_id }));
+
+            if (win) {
+                config.win++;
+                bot.sendMessage(chatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 5 دقائق جديدة.`);
+                config.tradingCycleActive = false;
+                config.currentTradeCountInCycle = 0;
+                config.currentStake = config.stake;
             } else {
-                config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2)); // مضاعفة الستيك
+                config.loss++;
+                config.currentTradeCountInCycle++;
 
-                // تحديد اتجاه الصفقة المضاعفة بناءً على قواعدك
-                if (config.currentTradeCountInCycle === 1) { // إذا كانت هذه أول مضاعفة
-                    config.nextTradeDirection = reverseDirection(config.baseTradeDirection);
-                }
-                // إذا كانت المضاعفات التالية، يبقى الاتجاه هو نفسه الذي تم تحديده في أول مضاعفة
+                let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
 
-                messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}. الصفقة التالية ستكون "${config.nextTradeDirection}".`;
-                console.log(`[Chat ID: ${currentChatId}] ❌ خسارة. جاري المضاعفة. الصفقة التالية: ${config.nextTradeDirection}`);
-                bot.sendMessage(currentChatId, messageText);
-                if (config.running) {
-                    enterTrade(config, config.nextTradeDirection, currentChatId, ws);
+                const maxMartingaleLosses = 4;
+
+                if (config.currentTradeCountInCycle >= maxMartingaleLosses) {
+                    messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
+                    bot.sendMessage(chatId, messageText);
+                    config.running = false;
+                    saveUserStates(); // حفظ الحالة عند الوصول للحد الأقصى للمارتينغال
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                    }
+                } else {
+                    config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
+                    messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}`;                    bot.sendMessage(chatId, messageText);
                 }
-                }
-              }
-    }
+            }
+            saveUserStates(); // حفظ بعد كل صفقة (ربح أو خسارة)
 
             if (config.tp > 0 && config.profit >= config.tp) {
                 bot.sendMessage(chatId, `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: ${config.tp.toFixed(2)}). تم إيقاف البوت تلقائياً.`);
@@ -263,7 +257,7 @@ else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.close();
                 }
-             else if (config.sl > 0 && config.profit <= -config.sl) {
+            } else if (config.sl > 0 && config.profit <= -config.sl) {
                 bot.sendMessage(chatId, `🛑 عذراً! تم الوصول إلى حد الخسارة (SL: ${config.sl.toFixed(2)}). تم إيقاف البوت تلقائياً.`);
                 config.running = false;
                 saveUserStates(); // حفظ الحالة عند الوصول للـ SL
@@ -280,7 +274,6 @@ else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract
             config.currentTradeCountInCycle = 0;
             saveUserStates(); // حفظ بعد خطأ من API
         }
-
     });
 
     ws.on('close', () => {
@@ -303,6 +296,7 @@ else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract
         // لا حاجة لـ saveUserStates هنا لأن ws.on('close') ستُشغل
     });
 } // <--- نهاية دالة startBotForUser
+
 
 
     
