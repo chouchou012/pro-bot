@@ -73,7 +73,7 @@ async function enterTrade(config, direction, chatId, ws) {
             "currency": "USD",
             "duration": 56,
             "duration_unit": "s", // 1 دقيقة
-            "symbol": "R_50" // الرمز الذي تتداول عليه
+            "symbol": "R_100" // الرمز الذي تتداول عليه
         }));
     } else {
         bot.sendMessage(chatId, `❌ لا يمكن الدخول في الصفقة: الاتصال بـ Deriv غير نشط. يرجى إعادة تشغيل البوت إذا استمرت المشكلة.`);
