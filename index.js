@@ -212,7 +212,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 "subscribe": 1
             }));
         }
-        else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && msg.proposal_open_contract.is_sold === 1) { 
+else if (msg.msg_type === 'proposal_open_contract' && msg.proposal_open_contract && msg.proposal_open_contract.is_sold === 1) { 
           const contract = msg.proposal_open_contract;
           const profit = parseFloat(contract.profit);
           const win = profit > 0;
@@ -226,27 +226,35 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
             config.currentStake = config.stake;
           } else {
             config.loss++;
-            config.currentTradeCountInCycle++;
+            config.currentTradeCountInCycle++; // زيادة عداد الخسائر المتتالية
+
             let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
-              config.tradingCycleActive = true;
-            const maxMartingaleLosses = 4;
-            if (config.currentTradeCountInCycle >= maxMartingaleLosses) {
-              messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
-              bot.sendMessage(chatId, messageText);
-              config.running = false;
-              saveUserStates(); 
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.close();
-              }
+              const MARTINGALE_FACTOR = 2.2;
+              const MAX_MARTINGALE_TRADES = 4;
+            if (config.currentTradeCountInCycle > MAX_MARTINGALE_TRADES) {
+                messageText += `\n🛑 تم الوصول إلى الحد الأقصى للمضاعفات (${MAX_MARTINGALE_TRADES} مرات خسارة متتالية). تم إيقاف البوت تلقائياً.`;
+                console.log(`[Chat ID: ${currentChatId}] 🛑 وصل إلى الحد الأقصى للمضاعفات.`);
+                bot.sendMessage(currentChatId, messageText);
+                config.running = false;
+                if (ws.readyState === WebSocket.OPEN) ws.close();
             } else {
-              config.currentStake = parseFloat((config.currentStake * 2.2).toFixed(2));
-              messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}`;
-              bot.sendMessage(chatId, messageText);
-            }
-          }
-          saveUserStates(); 
-            }
-       
+                config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2)); // مضاعفة الستيك
+
+                // تحديد اتجاه الصفقة المضاعفة بناءً على قواعدك
+                if (config.currentTradeCountInCycle === 1) { // إذا كانت هذه أول مضاعفة
+                    config.nextTradeDirection = reverseDirection(config.baseTradeDirection);
+                }
+                // إذا كانت المضاعفات التالية، يبقى الاتجاه هو نفسه الذي تم تحديده في أول مضاعفة
+
+                messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}. الصفقة التالية ستكون "${config.nextTradeDirection}".`;
+                console.log(`[Chat ID: ${currentChatId}] ❌ خسارة. جاري المضاعفة. الصفقة التالية: ${config.nextTradeDirection}`);
+                bot.sendMessage(currentChatId, messageText);
+                if (config.running) {
+                    enterTrade(config, config.nextTradeDirection, currentChatId, ws);
+                }
+                }
+              }
+    }
 
             if (config.tp > 0 && config.profit >= config.tp) {
                 bot.sendMessage(chatId, `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: ${config.tp.toFixed(2)}). تم إيقاف البوت تلقائياً.`);
@@ -272,7 +280,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
             config.currentTradeCountInCycle = 0;
             saveUserStates(); // حفظ بعد خطأ من API
         }
-            
+
     });
 
     ws.on('close', () => {
@@ -296,6 +304,8 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
     });
 } // <--- نهاية دالة startBotForUser
 
+
+    
 
 // -------------------------------------------------------------------------
 // أوامر تيليجرام
