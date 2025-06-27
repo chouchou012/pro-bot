@@ -135,10 +135,10 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
         const previousCandleOpen = config.candle5MinOpenPrice;
         const previousCandleClose = currentTickPrice;
         if (previousCandleClose < previousCandleOpen) {
-          tradeDirection = 'CALL';
+          tradeDirection = 'PUT';
           bot.sendMessage(chatId, '📉 الشمعة السابقة (5 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).');
         } else if (previousCandleClose > previousCandleOpen) {
-          tradeDirection = 'PUT';
+          tradeDirection = 'CALL';
           bot.sendMessage(chatId, '📈 الشمعة السابقة (5 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).');
         } else {
           bot.sendMessage(chatId, '↔ الشمعة السابقة (5 دقائق) بدون تغيير. لا يوجد اتجاه واضح.');
@@ -317,8 +317,8 @@ bot.onText(/\/start/, (msg) => {
 
     userStates[id] = {
         step: 'api',
-        candle10MinOpenPrice: null,
-        lastProcessed10MinIntervalStart: -1,
+        candle5MinOpenPrice: null,
+        lastProcessed5MinIntervalStart: -1,
         tradingCycleActive: false,
         currentTradeCountInCycle: 0,
         profit: 0, // تهيئة الربح
@@ -362,8 +362,8 @@ bot.on('message', (msg) => {
     } else if (state.step === 'sl') {
         state.sl = parseFloat(text);
         state.running = false;
-        state.candle10MinOpenPrice = null;
-        state.lastProcessed10MinIntervalStart = -1;
+        state.candle5MinOpenPrice = null;
+        state.lastProcessed5MinIntervalStart = -1;
         state.tradingCycleActive = false;
         state.currentTradeCountInCycle = 0;
         // الأرباح والخسائر والستيك الحالي يتم تعيينها عند البدء أو في (/run)
@@ -392,8 +392,8 @@ bot.onText(/\/run/, (msg) => {
     user.currentStake = user.stake; // إعادة تعيين الستيك الأساسي عند التشغيل
     user.currentTradeCountInCycle = 0; // إعادة تعيين عداد المارتينغال
     user.tradingCycleActive = false; // التأكد من عدم وجود دورة نشطة سابقة
-    user.candle10MinOpenPrice = null; // إعادة تعيين بيانات الشمعة
-    user.lastProcessed10MinIntervalStart = -1; // إعادة تعيين بيانات الشمعة
+    user.candle5MinOpenPrice = null; // إعادة تعيين بيانات الشمعة
+    user.lastProcessed5MinIntervalStart = -1; // إعادة تعيين بيانات الشمعة
     user.profit = 0; // إعادة تعيين الأرباح
     user.win = 0;    // إعادة تعيين عدد مرات الربح
     user.loss = 0;   // إعادة تعيين عدد مرات الخسارة
