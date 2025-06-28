@@ -71,7 +71,7 @@ async function enterTrade(config, direction, chatId, ws) {
             "basis": "stake",
             "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
             "currency": "USD",
-            "duration": 56,
+            "duration": 294,
             "duration_unit": "s", // 1 دقيقة
             "symbol": "R_50" // الرمز الذي تتداول عليه
         }));
