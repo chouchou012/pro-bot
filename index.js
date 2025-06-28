@@ -229,7 +229,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
 
                 let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
 
-                const maxMartingaleLosses = 5;
+                const maxMartingaleLosses = 6;
 
                 if (config.currentTradeCountInCycle >= maxMartingaleLosses) {
                     messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
