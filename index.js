@@ -73,7 +73,7 @@ async function enterTrade(config, direction, chatId, ws) {
             "currency": "USD",
             "duration": 56,
             "duration_unit": "s", // 1 دقيقة
-            "symbol": "R_100" // الرمز الذي تتداول عليه
+            "symbol": "R_50" // الرمز الذي تتداول عليه
         }));
     } else {
         bot.sendMessage(chatId, `❌ لا يمكن الدخول في الصفقة: الاتصال بـ Deriv غير نشط. يرجى إعادة تشغيل البوت إذا استمرت المشكلة.`);
@@ -116,7 +116,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
             } else {
                 bot.sendMessage(chatId, `✅ تم تسجيل الدخول بنجاح! الرصيد: ${msg.authorize.balance} ${msg.authorize.currency}`);
                 ws.send(JSON.stringify({
-                    "ticks": "R_100",
+                    "ticks": "R_50",
                     "subscribe": 1
                 }));
             }
@@ -139,10 +139,10 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                             const previousCandleClose = currentTickPrice;
 
                             if (previousCandleClose < previousCandleOpen) {
-                                tradeDirection = 'PUT';
+                                tradeDirection = 'CALL';
                                 bot.sendMessage(chatId, `📉 الشمعة السابقة (5 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                             } else if (previousCandleClose > previousCandleOpen) {
-                                tradeDirection = 'CALL';
+                                tradeDirection = 'PUT';
                                 bot.sendMessage(chatId, `📈 الشمعة السابقة (5 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                             } else {
                                 bot.sendMessage(chatId, `↔ الشمعة السابقة (5 دقائق) بدون تغيير. لا يوجد اتجاه واضح.`);
