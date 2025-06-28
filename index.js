@@ -136,10 +136,10 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                         const previousCandleOpen = config.candle5MinOpenPrice;
                         const previousCandleClose = currentTickPrice;
                         if (previousCandleClose < previousCandleOpen) {
-                          tradeDirection = 'CALL';
+                          tradeDirection = 'PUT';
                           bot.sendMessage(chatId, ` الشمعة السابقة (5 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                         } else if (previousCandleClose > previousCandleOpen) {
-                          tradeDirection = 'PUT';
+                          tradeDirection = 'CALL';
                           bot.sendMessage(chatId, ` الشمعة السابقة (5 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
                         } else {
                           // لا تفعل شيئا إذا كانت الشمعة متساوية
