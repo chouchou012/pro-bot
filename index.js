@@ -121,54 +121,59 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 }));
             }
         }
-               else if (msg.msg_type === 'tick' && msg.tick) { 
-  const currentTickPrice = parseFloat(msg.tick.quote);
-  const tickEpoch = msg.tick.epoch;
-  const tickDate = new Date(tickEpoch * 1000);
-  const currentMinute = tickDate.getMinutes();
-  const currentSecond = tickDate.getSeconds();
-  const current1MinIntervalStartMinute = Math.floor(currentMinute / 1) * 1;
-  if (currentSecond === 0 && currentMinute === current1MinIntervalStartMinute) {
-    if (config.lastProcessed1MinIntervalStart !== current1MinIntervalStartMinute) {
-      let tradeDirection = 'none';
-      if (config.candle1MinOpenPrice !== null) {
-        const previousCandleOpen = config.candle1MinOpenPrice;
-        const previousCandleClose = currentTickPrice;
-        if (previousCandleClose < previousCandleOpen) {
-          tradeDirection = 'PUT';
-          bot.sendMessage(chatId, `📉 الشمعة السابقة (1 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
-        } else if (previousCandleClose > previousCandleOpen) {
-          tradeDirection = 'CALL';
-          bot.sendMessage(chatId, `📈 الشمعة السابقة (1 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
-        } else {
-          bot.sendMessage(chatId, `↔ الشمعة السابقة (1 دقائق) بدون تغيير. لا يوجد اتجاه واضح.`);
+              else if (msg.msg_type === 'tick' && msg.tick) {
+          const currentTickPrice = parseFloat(msg.tick.quote);
+          const tickEpoch = msg.tick.epoch;
+          const tickDate = new Date(tickEpoch * 1000);
+          const currentMinute = tickDate.getMinutes();
+          const currentSecond = tickDate.getSeconds();
+          const current1MinIntervalStartMinute = Math.floor(currentMinute / 1) * 1;
+
+          if (currentSecond === 0 && currentMinute === current1MinIntervalStartMinute) {
+            config.candle1MinOpenPrice = currentTickPrice;
+          }
+
+          if (currentSecond >= 59 && currentMinute === current1MinIntervalStartMinute) {
+            if (config.lastProcessed1MinIntervalStart !== current1MinIntervalStartMinute) {
+              let tradeDirection = 'none';
+              if (config.candle1MinOpenPrice !== null) {
+                const previousCandleOpen = config.candle1MinOpenPrice;
+                const previousCandleClose = currentTickPrice;
+                if (previousCandleClose < previousCandleOpen) {
+                  tradeDirection = 'PUT';
+                  bot.sendMessage(chatId, `📉 الشمعة السابقة (1 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
+                } else if (previousCandleClose > previousCandleOpen) {
+                  tradeDirection = 'CALL';
+                  bot.sendMessage(chatId, `📈 الشمعة السابقة (1 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
+                } else {
+                  bot.sendMessage(chatId, `↔ الشمعة السابقة (1 دقائق) بدون تغيير. لا يوجد اتجاه واضح.`);
+                }
+              } else {
+                bot.sendMessage(chatId, `⏳ جاري جمع بيانات الشمعة الأولى (1 دقائق). الرجاء الانتظار حتى بداية الشمعة التالية لتحديد الاتجاه.`);
+              }
+              config.candle5MinOpenPrice = currentTickPrice;
+              config.lastProcessed1MinIntervalStart = current1MinIntervalStartMinute;
+              saveUserStates(); // حفظ بعد تحديث بيانات الشمعة
+              if (tradeDirection !== 'none' && config.running && !config.tradingCycleActive) {
+                if (config.currentTradeCountInCycle > 0) {
+                  bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
+                } else {
+                  bot.sendMessage(chatId, `✅ جاري الدخول في صفقة أساسية بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
+                }
+                await enterTrade(config, tradeDirection, chatId, ws);
+                config.tradingCycleActive = true;
+                saveUserStates(); // حفظ بعد بدء دورة التداول
+              } else {
+                if (!config.tradingCycleActive) {
+                  config.currentStake = config.stake;
+                  config.currentTradeCountInCycle = 0;
+                  saveUserStates(); // حفظ بعد إعادة ضبط الستيك والعداد
+                }
+              }
+              return;
+            }
+          }
         }
-      } else {
-        bot.sendMessage(chatId, `⏳ جاري جمع بيانات الشمعة الأولى (1 دقائق). الرجاء الانتظار حتى بداية الشمعة التالية لتحديد الاتجاه.`);
-      }
-      config.candle5MinOpenPrice = currentTickPrice;
-      config.lastProcessed1MinIntervalStart = current1MinIntervalStartMinute;
-      saveUserStates(); // حفظ بعد تحديث بيانات الشمعة
-      if (tradeDirection !== 'none' && config.running && !config.tradingCycleActive) {
-        if (config.currentTradeCountInCycle > 0) {
-          bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
-        } else {
-          bot.sendMessage(chatId, `✅ جاري الدخول في صفقة أساسية بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
-        }
-        await enterTrade(config, tradeDirection, chatId, ws);
-        config.tradingCycleActive = true;
-        saveUserStates(); // حفظ بعد بدء دورة التداول
-      } else {
-        if (!config.tradingCycleActive) {
-          config.currentStake = config.stake;
-          config.currentTradeCountInCycle = 0;
-          saveUserStates(); // حفظ بعد إعادة ضبط الستيك والعداد
-        }
-      }
-      return;
-    }
-  }
-}
  else if (msg.msg_type === 'proposal') { 
   if (msg.error) { 
     bot.sendMessage(chatId, `❌ فشل اقتراح الصفقة: ${msg.error.message}`);
