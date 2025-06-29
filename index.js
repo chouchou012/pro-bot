@@ -136,24 +136,24 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
         const previousCandleClose = currentTickPrice;
         if (previousCandleClose < previousCandleOpen) {
           tradeDirection = 'PUT';
-          bot.sendMessage(chatId, 📉 الشمعة السابقة (1 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).);
+          bot.sendMessage(chatId, `📉 الشمعة السابقة (1 دقائق) هابطة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
         } else if (previousCandleClose > previousCandleOpen) {
           tradeDirection = 'CALL';
-          bot.sendMessage(chatId, 📈 الشمعة السابقة (1 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).);
+          bot.sendMessage(chatId, `📈 الشمعة السابقة (1 دقائق) صاعدة (فتح: ${previousCandleOpen.toFixed(3)}, إغلاق: ${previousCandleClose.toFixed(3)}).`);
         } else {
-          bot.sendMessage(chatId, ↔ الشمعة السابقة (1 دقائق) بدون تغيير. لا يوجد اتجاه واضح.);
+          bot.sendMessage(chatId, `↔ الشمعة السابقة (1 دقائق) بدون تغيير. لا يوجد اتجاه واضح.`);
         }
       } else {
-        bot.sendMessage(chatId, ⏳ جاري جمع بيانات الشمعة الأولى (1 دقائق). الرجاء الانتظار حتى بداية الشمعة التالية لتحديد الاتجاه.);
+        bot.sendMessage(chatId, `⏳ جاري جمع بيانات الشمعة الأولى (1 دقائق). الرجاء الانتظار حتى بداية الشمعة التالية لتحديد الاتجاه.`);
       }
       config.candle5MinOpenPrice = currentTickPrice;
       config.lastProcessed1MinIntervalStart = current1MinIntervalStartMinute;
       saveUserStates(); // حفظ بعد تحديث بيانات الشمعة
       if (tradeDirection !== 'none' && config.running && !config.tradingCycleActive) {
         if (config.currentTradeCountInCycle > 0) {
-          bot.sendMessage(chatId, 🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).);
+          bot.sendMessage(chatId, `🔄 جاري الدخول في صفقة مارتينغال رقم (${config.currentTradeCountInCycle}) بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
         } else {
-          bot.sendMessage(chatId, ✅ جاري الدخول في صفقة أساسية بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).);
+          bot.sendMessage(chatId, `✅ جاري الدخول في صفقة أساسية بمبلغ ${config.currentStake.toFixed(2)} بناءً على اتجاه الشمعة السابقة (${tradeDirection}).`);
         }
         await enterTrade(config, tradeDirection, chatId, ws);
         config.tradingCycleActive = true;
