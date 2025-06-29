@@ -91,36 +91,38 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
     const ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=22168');
     userDerivConnections[chatId] = ws;
 
-    ws.on('open', () => {
-        bot.sendMessage(chatId, '✅ تم الاتصال بـ Deriv. جاري المصادقة...');
-        ws.send(JSON.stringify({ authorize: config.token }));
-    });
+            ws.on('open', () => {
+              bot.sendMessage(chatId, '✅ تم الاتصال بـ Deriv. جاري المصادقة...');
+              ws.send(JSON.stringify({ authorize: config.token }));
+              if (userStates[chatId].tradeActive) {
+                ws.send(JSON.stringify({ "proposal_open_contract": 1, "contract_id": userStates[chatId].contractId, "subscribe": 1 }));
+              }
+            });
 
-    ws.on('message', async (data) => {
-        const msg = JSON.parse(data);
-
-        if (!config.running) {
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.close();
-                bot.sendMessage(chatId, '🛑 تم إغلاق اتصال Deriv.');
-            }
-            return;
-        }
-
-        if (msg.msg_type === 'authorize') {
-            if (msg.error) {
-                bot.sendMessage(chatId, `❌ فشلت المصادقة: ${msg.error.message}. يرجى التحقق من API Token.`);
-                config.running = false;
-                ws.close();
-                saveUserStates(); // حفظ الحالة بعد الفشل
-            } else {
-                bot.sendMessage(chatId, `✅ تم تسجيل الدخول بنجاح! الرصيد: ${msg.authorize.balance} ${msg.authorize.currency}`);
-                ws.send(JSON.stringify({
-                    "ticks": "R_50",
-                    "subscribe": 1
-                }));
-            }
-        }
+            ws.on('message', async (data) => {
+              const msg = JSON.parse(data);
+              if (!config.running) {
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.close();
+                  bot.sendMessage(chatId, '🛑 تم إغلاق اتصال Deriv.');
+                }
+                return;
+              }
+              if (msg.msg_type === 'authorize') {
+                if (msg.error) {
+                  bot.sendMessage(chatId, `❌ فشلت المصادقة: ${msg.error.message}. يرجى التحقق من API Token.`);
+                  config.running = false;
+                  ws.close();
+                  saveUserStates(); // حفظ الحالة بعد الفشل
+                } else {
+                  bot.sendMessage(chatId, `✅ تم تسجيل الدخول بنجاح! الرصيد: ${msg.authorize.balance} ${msg.authorize.currency}`);
+                  ws.send(JSON.stringify({ "ticks": "R_50", "subscribe": 1 }));
+                  if (userStates[chatId].tradeActive) {
+                    ws.send(JSON.stringify({ "proposal_open_contract": 1, "contract_id": userStates[chatId].contractId, "subscribe": 1 }));
+                  }
+                }
+              }
+            
             else if (msg.msg_type === 'tick' && msg.tick) {
                 const currentTickPrice = parseFloat(msg.tick.quote);
                 const tickEpoch = msg.tick.epoch;
@@ -299,7 +301,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
 
 
 
-    
+
 
 // -------------------------------------------------------------------------
 // أوامر تيليجرام
@@ -330,6 +332,9 @@ bot.onText(/\/start/, (msg) => {
         lastProcessed5MinIntervalStart: -1,
         tradingCycleActive: false,
         currentTradeCountInCycle: 0,
+        tradeActive: false,
+        contractId: null,
+        proposalId: null,
         profit: 0, // تهيئة الربح
         win: 0,    // تهيئة عدد مرات الربح
         loss: 0,   // تهيئة عدد مرات الخسارة
