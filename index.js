@@ -128,7 +128,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
                 const currentMinute = tickDate.getMinutes();
                 const currentSecond = tickDate.getSeconds();
 
-                const current5MinIntervalStartMinute = Math.floor(currentMinute / 1) * 1;
+                const current1MinIntervalStartMinute = Math.floor(currentMinute / 1) * 1;
 
                 if (currentSecond === 0 && currentMinute === current1MinIntervalStartMinute) {
                     if (config.lastProcessed1MinIntervalStart !== current1MinIntervalStartMinute) {
