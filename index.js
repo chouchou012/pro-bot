@@ -161,7 +161,6 @@ function startBotForUser(chatId, config) {
         const currentChatId = chatId;
 
         // 🟢🟢🟢 DEBUG: سجل نوع الرسالة الواردة (تم تفعيله لأغراض التصحيح) 🟢🟢🟢
-        console.log(`[Chat ID: ${currentChatId}] RECEIVED MSG TYPE: ${msg.msg_type}`);
 
         // إذا توقف البوت، أغلق الاتصال وتجاهل الرسائل
         if (!config.running && ws.readyState === WebSocket.OPEN) {
@@ -201,9 +200,7 @@ function startBotForUser(chatId, config) {
                         // مما يعني أن 'lastReceivedTickPrice' قد لا يُحفظ في كل مرة إلا عند استدعاء 'saveUserStates()' في مكان آخر.
 
                         // 🟢🟢🟢 DEBUG: يمكنك تفعيل هذا لمراقبة التيكات 🟢🟢🟢
-                        console.log(`[Chat ID: ${currentChatId}] TICK: ${currentTickPrice.toFixed(3)} at ${tickDate.toLocaleTimeString()}`);
-                        console.log(`[Chat ID: ${currentChatId}] Current Minute: ${currentMinute}, Current Second: ${currentSecond}`);
-
+                       
                         // تم حذف: const current5MinIntervalStartMinute = Math.floor(currentMinute / 5) * 5;
                         // (لم يعد له صلة بمنطق التحليل الجديد)
 
@@ -242,9 +239,9 @@ function startBotForUser(chatId, config) {
                                     let tradeDirection = 'none';
 
                                     if (priceAt0thMinuteStart < config.priceAt4thMinuteStart) {
-                                        tradeDirection = 'CALL'; // هبوط في الشمعة -> الصفقة التالية صعود
+                                        tradeDirection = 'PUT'; // هبوط في الشمعة -> الصفقة التالية صعود
                                     } else if (priceAt0thMinuteStart > config.priceAt4thMinuteStart) {
-                                        tradeDirection = 'PUT'; // صعود في الشمعة -> الصفقة التالية هبوط
+                                        tradeDirection = 'CALL'; // صعود في الشمعة -> الصفقة التالية هبوط
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
                                     }
@@ -456,7 +453,6 @@ function startBotForUser(chatId, config) {
             } else {
                 config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2));
 
-                config.nextTradeDirection = (config.baseTradeDirection === 'CALL') ? 'PUT' : 'CALL';
 
                 messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}. الصفقة التالية ستكون "${config.nextTradeDirection}".`;
                 console.log(`[Chat ID: ${currentChatId}] ❌ خسارة. جاري المضاعفة. الصفقة التالية: ${config.nextTradeDirection}`);
