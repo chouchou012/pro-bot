@@ -13,7 +13,7 @@ let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مس�
 
 // تعريف الثوابت للمضاعفات
 const MARTINGALE_FACTOR = 2.2;
-const MAX_MARTINGALE_TRADES = 4; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
+const MAX_MARTINGALE_TRADES = 6; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
 
 // دالة لحفظ جميع حالات المستخدمين إلى ملف JSON
 function saveUserStates() {
@@ -416,75 +416,63 @@ function startBotForUser(chatId, config) {
     }); // نهاية ws.on('message')
 
     // دالة مساعدة لمعالجة نتائج الصفقة (تم فصلها لتجنب التكرار)
-    function handleTradeResult(currentChatId, config, ws, result) {
-        console.log(`[Chat ID: ${currentChatId}] Debug: handleTradeResult started. Result: `, result);
-
-        const profit = result.profit;
-        const isWin = result.win;
-
-        config.profit += profit;
-
-        if (isWin) {
-            config.win++;
-            console.log(`[Chat ID: ${currentChatId}] ✅ ربح! ربح: ${profit.toFixed(2)}`);
-            bot.sendMessage(currentChatId, `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 5 دقائق جديدة.`);
-
-            config.currentTradeCountInCycle = 0;
-            config.currentStake = config.stake;
-            config.baseTradeDirection = null;
-            config.nextTradeDirection = null;
-            config.currentOpenContract = null;
-            config.tradingCycleActive = false;
-
-        } else { // حالة الخسارة
-            config.loss++;
-            config.currentTradeCountInCycle++;
-
-            let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
-
-            if (config.currentTradeCountInCycle > MAX_MARTINGALE_TRADES) {
-                messageText +=` \n🛑 تم الوصول إلى الحد الأقصى للمضاعفات (${MAX_MARTINGALE_TRADES} مرات خسارة متتالية). تم إيقاف البوت تلقائياً.`;
-                console.log(`[Chat ID: ${currentChatId}] 🛑 وصل إلى الحد الأقصى للمضاعفات.`);
-                bot.sendMessage(currentChatId, messageText);
-                config.running = false;
-                if (ws.readyState === WebSocket.OPEN) ws.close();
-                config.currentOpenContract = null;
-                config.tradingCycleActive = false;
-            } else {
-                config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2));
-  config.tradingCycleActive = false;
-  config.baseTradeDirection = null; // إعادة تعيين اتجاه الصفقة الأساسية
-  config.nextTradeDirection = null; // إعادة تعيين اتجاه الصفقة التالية
-  bot.sendMessage(currentChatId, `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n🔄 جاري انتظار الفرصة التالية.`);
-
-                config.currentOpenContract = null;
-              if (config.running) {
-                    enterTrade(config, config.nextTradeDirection, currentChatId, ws);
-                }
-
-            }
-        }
-        saveUserStates();
-
-        // فحص Take Profit / Stop Loss بعد كل صفقة
-        if (config.tp > 0 && config.profit >= config.tp) {
-            console.log(`[Chat ID: ${currentChatId}] 🎯 وصل إلى هدف الربح.`);
-            bot.sendMessage(currentChatId, `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: ${config.tp.toFixed(2)}). تم إيقاف البوت تلقائياً.`);
-            config.running = false;
-            saveUserStates();
-            if (ws.readyState === WebSocket.OPEN) ws.close();
-            config.currentOpenContract = null;
-            config.tradingCycleActive = false;
-        } else if (config.sl > 0 && config.profit <= -config.sl) {
-            console.log(`[Chat ID: ${currentChatId}] 🛑 وصل إلى حد الخسارة.`);
-            bot.sendMessage(currentChatId, `🛑 عذراً! تم الوصول إلى حد الخسارة (SL: ${config.sl.toFixed(2)}). تم إيقاف البوت تلقائياً.`);
-            config.running = false;
-            saveUserStates();
-            if (ws.readyState === WebSocket.OPEN) ws.close();
-            config.currentOpenContract = null;
-            config.tradingCycleActive = false;
-        }
-    }
+    function handleTradeResult(currentChatId, config, ws, result) { 
+  console.log(`[Chat ID: ${currentChatId}] Debug: handleTradeResult started. Result: `, result); 
+  const profit = result.profit; 
+  const isWin = result.win; 
+  config.profit += profit; 
+  if (isWin) { 
+    config.win++; 
+    console.log( `[Chat ID: ${currentChatId}] ✅ ربح! ربح: ${profit.toFixed(2)} `); 
+    bot.sendMessage(currentChatId,  `📊 نتيجة الصفقة: ✅ ربح! ربح: ${profit.toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n✅ تم الربح. جاري انتظار شمعة 5 دقائق جديدة. `); 
+    config.currentTradeCountInCycle = 0; 
+    config.currentStake = config.stake; 
+    config.baseTradeDirection = null; 
+    config.nextTradeDirection = null; 
+    config.currentOpenContract = null; 
+    config.tradingCycleActive = false; 
+  } else { 
+    // حالة الخسارة 
+    config.loss++; 
+    config.currentTradeCountInCycle++; 
+    let messageText =  `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss} `; 
+    if (config.currentTradeCountInCycle > MAX_MARTINGALE_TRADES) { 
+      messageText +=` \n🛑 تم الوصول إلى الحد الأقصى للمضاعفات (${MAX_MARTINGALE_TRADES} مرات خسارة متتالية). تم إيقاف البوت تلقائياً.`; 
+      console.log( `[Chat ID: ${currentChatId}] 🛑 وصل إلى الحد الأقصى للمضاعفات. `); 
+      bot.sendMessage(currentChatId, messageText); 
+      config.running = false; 
+      if (ws.readyState === WebSocket.OPEN) ws.close(); 
+      config.currentOpenContract = null; 
+      config.tradingCycleActive = false; 
+    } else { 
+      config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2)); 
+      config.tradingCycleActive = false; 
+      config.baseTradeDirection = null; 
+      config.nextTradeDirection = null; 
+      bot.sendMessage(currentChatId,  `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n🔄 جاري انتظار الفرصة التالية. `); 
+      config.currentOpenContract = null; 
+    } 
+  } 
+  saveUserStates(); 
+  // فحص Take Profit / Stop Loss بعد كل صفقة 
+  if (config.tp > 0 && config.profit >= config.tp) { 
+    console.log( `[Chat ID: ${currentChatId}] 🎯 وصل إلى هدف الربح. `); 
+    bot.sendMessage(currentChatId,  `🎯 تهانينا! تم الوصول إلى هدف الربح (TP: ${config.tp.toFixed(2)}). تم إيقاف البوت تلقائياً. `); 
+    config.running = false; 
+    saveUserStates(); 
+    if (ws.readyState === WebSocket.OPEN) ws.close(); 
+    config.currentOpenContract = null; 
+    config.tradingCycleActive = false; 
+  } else if (config.sl > 0 && config.profit <= -config.sl) { 
+    console.log( `[Chat ID: ${currentChatId}] 🛑 وصل إلى حد الخسارة. `); 
+    bot.sendMessage(currentChatId,  `🛑 عذراً! تم الوصول إلى حد الخسارة (SL: ${config.sl.toFixed(2)}). تم إيقاف البوت تلقائياً. `); 
+    config.running = false; 
+    saveUserStates(); 
+    if (ws.readyState === WebSocket.OPEN) ws.close(); 
+    config.currentOpenContract = null; 
+    config.tradingCycleActive = false; 
+  } 
+}
 
 
     ws.on('close', (code, reason) => {
