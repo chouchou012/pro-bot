@@ -239,9 +239,9 @@ function startBotForUser(chatId, config) {
                                     let tradeDirection = 'none';
 
                                     if (priceAt0thMinuteStart < config.priceAt4thMinuteStart) {
-                                        tradeDirection = 'PUT'; // هبوط في الشمعة -> الصفقة التالية صعود
+                                        tradeDirection = 'CALL'; // هبوط في الشمعة -> الصفقة التالية صعود
                                     } else if (priceAt0thMinuteStart > config.priceAt4thMinuteStart) {
-                                        tradeDirection = 'CALL'; // صعود في الشمعة -> الصفقة التالية هبوط
+                                        tradeDirection = 'PUT'; // صعود في الشمعة -> الصفقة التالية هبوط
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
                                     }
@@ -452,11 +452,10 @@ function startBotForUser(chatId, config) {
                 config.tradingCycleActive = false;
             } else {
                 config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2));
-                config.nextTradeDirection = (config.baseTradeDirection === 'CALL') ? 'PUT' : 'CALL';
-
-                messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}. الصفقة التالية ستكون "${config.nextTradeDirection}".`;
-                console.log(`[Chat ID: ${currentChatId}] ❌ خسارة. جاري المضاعفة. الصفقة التالية: ${config.nextTradeDirection}`);
-                bot.sendMessage(currentChatId, messageText);
+  config.tradingCycleActive = false;
+  config.baseTradeDirection = null; // إعادة تعيين اتجاه الصفقة الأساسية
+  config.nextTradeDirection = null; // إعادة تعيين اتجاه الصفقة التالية
+  bot.sendMessage(currentChatId, 📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n🔄 جاري انتظار الفرصة التالية.);
 
                 config.currentOpenContract = null;
               if (config.running) {
