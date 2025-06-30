@@ -455,7 +455,7 @@ function startBotForUser(chatId, config) {
   config.tradingCycleActive = false;
   config.baseTradeDirection = null; // إعادة تعيين اتجاه الصفقة الأساسية
   config.nextTradeDirection = null; // إعادة تعيين اتجاه الصفقة التالية
-  bot.sendMessage(currentChatId, 📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n🔄 جاري انتظار الفرصة التالية.);
+  bot.sendMessage(currentChatId, `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}\n\n🔄 جاري انتظار الفرصة التالية.`);
 
                 config.currentOpenContract = null;
               if (config.running) {
