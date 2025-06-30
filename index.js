@@ -2,6 +2,10 @@ const WebSocket = require('ws');
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs'); // لإدارة حفظ وتحميل الحالة
 const express = require('express');
+const app = express();
+app.get('/', (req, res) => res.send('✅ Deriv bot is running'));
+app.listen(3000, () => console.log('🌐 UptimeRobot is connected on port 3000'));
+
 
 // 2. المتغيرات العامة والثوابت
 // *تحذير: لا يوصى بهذا في بيئة الإنتاج لأسباب أمنية.*
