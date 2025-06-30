@@ -10,7 +10,7 @@ app.listen(3000, () => console.log('🌐 UptimeRobot is connected on port 3000')
 // 2. المتغيرات العامة والثوابت
 // *تحذير: لا يوصى بهذا في بيئة الإنتاج لأسباب أمنية.*
 const DERIV_APP_ID = '22168'; // !!! تأكد من أن هذا هو معرف تطبيقك الفعلي من Deriv !!!
-const TELEGRAM_BOT_TOKEN = '8021935025:AAHgxw8_cr1EsXKlRb_EYOeCxItPN8ELLBM'; // !!! استبدل هذا بتوكن بوت تلغرام الخاص بك !!!
+const bot = new TelegramBot('8021935025:AAHgxw8_cr1EsXKlRb_EYOeCxItPN8ELLBM', { polling: true }); // <--- تأكد من توكن التليجرام الخاص بك
 const DERIV_API_URL = `wss://green.derivws.com/websockets/v3?app_id=${DERIV_APP_ID}`;
 
 const USER_DATA_FILE = 'user_data.json';
