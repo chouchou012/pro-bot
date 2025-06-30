@@ -71,7 +71,7 @@ async function enterTrade(config, direction, chatId, ws) {
             "basis": "stake",
             "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
             "currency": "USD",
-            "duration": 56,
+            "duration": 294,
             "duration_unit": "s", // 1 دقيقة
             "symbol": "R_50" // الرمز الذي تتداول عليه
         }));
@@ -235,7 +235,7 @@ function startBotForUser(chatId, config) { // <--- تم نقلها هنا لتك
 
                 let messageText = `📊 نتيجة الصفقة: ❌ خسارة! خسارة: ${Math.abs(profit).toFixed(2)}\n💰 الرصيد الكلي: ${config.profit.toFixed(2)}\n📈 ربح: ${config.win} | 📉 خسارة: ${config.loss}`;
 
-                const maxMartingaleLosses = 6;
+                const maxMartingaleLosses = 7;
 
                 if (config.currentTradeCountInCycle >= maxMartingaleLosses) {
                     messageText += `\n🛑 تم الوصول إلى الحد الأقصى للخسائر في دورة المارتينغال (${maxMartingaleLosses} صفقات متتالية). تم إيقاف البوت تلقائياً.`;
