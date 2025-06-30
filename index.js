@@ -109,8 +109,8 @@ async function enterTrade(config, direction, chatId, ws) {
             "basis": "stake",
             "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
             "currency": "USD",
-            "duration": 1,
-            "duration_unit": "m", // 1 دقيقة
+            "duration": 58,
+            "duration_unit": "s", // 1 دقيقة
             "symbol": "R_100" // الرمز الذي تتداول عليه
         }));
 
@@ -239,9 +239,9 @@ function startBotForUser(chatId, config) {
                                     let tradeDirection = 'none';
 
                                     if (priceAt0thMinuteStart < config.priceAt4thMinuteStart) {
-                                        tradeDirection = 'CALL'; // هبوط في الشمعة -> الصفقة التالية صعود
+                                        tradeDirection = 'PUT'; // هبوط في الشمعة -> الصفقة التالية صعود
                                     } else if (priceAt0thMinuteStart > config.priceAt4thMinuteStart) {
-                                        tradeDirection = 'PUT'; // صعود في الشمعة -> الصفقة التالية هبوط
+                                        tradeDirection = 'CALL'; // صعود في الشمعة -> الصفقة التالية هبوط
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
                                     }
