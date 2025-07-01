@@ -13,7 +13,7 @@ let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مس�
 
 // تعريف الثوابت للمضاعفات
 const MARTINGALE_FACTOR = 2.2;
-const MAX_MARTINGALE_TRADES = 6; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
+const MAX_MARTINGALE_TRADES = 5; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
 
 // دالة لحفظ جميع حالات المستخدمين إلى ملف JSON
 function saveUserStates() {
@@ -128,7 +128,10 @@ function reverseDirection(direction) {
 
 // دالة رئيسية لبدء تشغيل البوت لكل مستخدم
 function startBotForUser(chatId, config) {
-    // إغلاق أي اتصال سابق لهذا المستخدم قبل إنشاء اتصال جديد
+ if (config.savedContract) {
+  config.currentOpenContract = config.savedContract;
+  config.savedContract = null;
+}
     if (userDerivConnections[chatId] && userDerivConnections[chatId].readyState !== WebSocket.CLOSED) {
         console.log(`[Chat ID: ${chatId}] إغلاق اتصال Deriv سابق قبل بدء اتصال جديد.`);
         userDerivConnections[chatId].close();
@@ -483,6 +486,7 @@ function startBotForUser(chatId, config) {
             clearTimeout(config.predictionCheckTimer);
             config.predictionCheckTimer = null;
         }
+        config.savedContract = config.currentOpenContract;
         config.currentOpenContract = null; // مسح العقد المفتوح لضمان النظافة
 
         if (config.running) {
