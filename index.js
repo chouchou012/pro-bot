@@ -243,7 +243,8 @@ function startBotForUser(chatId, config) {
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
                                     }
-
+const minuteBeforeCurrent = (currentMinute === 0) ? 59 : currentMinute - 1;
+console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt0thMinuteStart.toFixed(3)}، سعر ${currentMinute}:00 هو ${priceAt1thMinuteStart.toFixed(3)}. الاتجاه: ${tradeDirection}`);
                                     // 🟢🟢🟢 رسالة تليجرام: تلخيص التحليل والاتجاه المتوقع 🟢🟢🟢
                                     console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt1thMinuteStart.toFixed(3)}، سعر ${currentMinute}:00 هو ${priceAt0thMinuteStart.toFixed(3)}. الاتجاه: ${tradeDirection}`);
                                     bot.sendMessage(currentChatId, `📊 تحليل الشمعة الأخيرة (${minuteBeforeCurrent}:00 -> ${currentMinute}:00):\nسعر البدء: ${config.priceAt1thMinuteStart.toFixed(3)}\nسعر الإغلاق: ${priceAt0thMinuteStart.toFixed(3)}\nالاتجاه المتوقع: ${tradeDirection}`);
