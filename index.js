@@ -215,9 +215,9 @@ function startBotForUser(chatId, config) {
                             // --- الخطوة 1: تسجيل السعر في بداية الدقيقة X9 (أو X4) ---
                             // (نقطة بدء تحليل "الشمعة" التي سندخل عليها صفقة عكسية)
                             // (يمكنك تغيير currentMinute % 10 === 9 إلى currentMinute % 5 === 4 إذا كنت تستهدف دورة 5 دقائق)
-                            if (currentSecond === 0 && (currentMinute % 5 === 1)) {
+                            if (currentSecond === 0 && (currentMinute % 5 === 0)) {
                                 if (config.minuteOfLastDecision !== currentMinute) { // لمنع التكرار لنفس الدقيقة
-                                    config.priceAt1thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
+                                    config.priceAt0thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
                                     config.waitingForNextTrade = true; // الآن ننتظر أول تيك من الدقيقة التالية لإكمال التحليل
                                     config.minuteOfLastDecision = currentMinute; // لتسجيل أننا اتخذنا قرار في هذه الدقيقة
                                     saveUserStates(); // حفظ الحالة بعد تحديد نقطة البداية
@@ -230,20 +230,15 @@ function startBotForUser(chatId, config) {
                             // --- الخطوة 2: تسجيل السعر في بداية الدقيقة X0 (أو X5) والدخول في الصفقة ---
                             // (نقطة إغلاق "الشمعة" واتخاذ قرار الصفقة)
                             // (يمكنك تغيير currentMinute % 10 === 0 إلى currentMinute % 5 === 0 إذا كنت تستهدف دورة 5 دقائق)
-                            if (currentSecond === 0 && (currentMinute % 5 === 0) && config.waitingForNextTrade === true) {
+                            if (currentSecond === 0 && (currentMinute % 5 === 1) && config.waitingForNextTrade === true) {
 
-                                // حساب الدقيقة السابقة للتأكد من أنها دقيقة X9 أو X4 الصحيحة
-                                const minuteBeforeCurrent = (currentMinute === 0) ? 59 : currentMinute - 1;
 
-                                // التأكد من أن سعر الدقيقة X9 تم تسجيله ومن أننا كنا ننتظر هذه اللحظة
-                                if (config.priceAt4thMinuteStart !== null && (minuteBeforeCurrent % 5 === 1) && config.minuteOfLastDecision === minuteBeforeCurrent) {
+                                    const priceAt1thMinuteStart = currentTickPrice; // هذا هو "سعر الإغلاق" لدقيقة التحليل
+                                   let  tradeDirection = 'none';
 
-                                    const priceAt0thMinuteStart = currentTickPrice; // هذا هو "سعر الإغلاق" لدقيقة التحليل
-                                    let tradeDirection = 'none';
-
-                                    if (priceAt0thMinuteStart < config.priceAt1thMinuteStart) {
+                                    if (priceAt1thMinuteStart < config.priceAt0thMinuteStart) {
                                         tradeDirection = 'CALL'; // هبوط في الشمعة -> الصفقة التالية صعود
-                                    } else if (priceAt0thMinuteStart > config.priceAt1thMinuteStart) {
+                                    } else if (priceAt1thMinuteStart > config.priceAt0thMinuteStart) {
                                         tradeDirection = 'PUT'; // صعود في الشمعة -> الصفقة التالية هبوط
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
@@ -278,14 +273,14 @@ function startBotForUser(chatId, config) {
                                     }
 
                                     // إعادة تعيين هذه المتغيرات بعد معالجة القرار لهذه الدورة
-                                    config.priceAt1thMinuteStart = null;
+                                    config.priceAt0thMinuteStart = null;
                                     config.waitingForNextTrade = false;
                                     // config.minuteOfLastDecision يبقى كما هو لأنه سيتم تحديثه في بداية الدقيقة X9 التالية
                                     saveUserStates(); // حفظ الحالة بعد إعادة التعيين
                                 }
                             }
                         }
-                    }
+                  
 
 
         else if (msg.msg_type === 'proposal') {
