@@ -236,7 +236,7 @@ function startBotForUser(chatId, config) {
                                 const minuteBeforeCurrent = (currentMinute === 0) ? 59 : currentMinute - 1;
 
                                 // التأكد من أن سعر الدقيقة X9 تم تسجيله ومن أننا كنا ننتظر هذه اللحظة
-                                if (config.priceAt1thMinuteStart !== null && (minuteBeforeCurrent % 5 === 1) && config.minute1fLastDecision === minuteBeforeCurrent) {
+                                if (config.priceAt1thMinuteStart !== null && (minuteBeforeCurrent % 5 === 0) && config.minute0fLastDecision === minuteBeforeCurrent) {
 
                                     const priceAt1thMinuteStart = currentTickPrice; // هذا هو "سعر الإغلاق" لدقيقة التحليل
                                     let tradeDirection = 'none';
