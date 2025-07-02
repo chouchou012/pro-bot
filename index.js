@@ -217,7 +217,7 @@ function startBotForUser(chatId, config) {
                             // (يمكنك تغيير currentMinute % 10 === 9 إلى currentMinute % 5 === 4 إذا كنت تستهدف دورة 5 دقائق)
                             if (currentSecond === 0 && (currentMinute % 5 === 0)) {
                                 if (config.minuteOfLastDecision !== currentMinute) { // لمنع التكرار لنفس الدقيقة
-                                    config.priceAt1thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
+                                    config.priceAt0thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
                                     config.waitingForNextTrade = true; // الآن ننتظر أول تيك من الدقيقة التالية لإكمال التحليل
                                     config.minuteOfLastDecision = currentMinute; // لتسجيل أننا اتخذنا قرار في هذه الدقيقة
                                     saveUserStates(); // حفظ الحالة بعد تحديد نقطة البداية
