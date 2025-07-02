@@ -210,14 +210,14 @@ function startBotForUser(chatId, config) {
                         // منطق تحديد اتجاه الصفقة الأساسية (تحليل آخر دقيقة: X9 -> X0)
                         if (config.running && !config.tradingCycleActive) {
                             // 🟢🟢🟢 DEBUG: جديد لمعرفة دخول الكتلة 🟢🟢🟢
-                            console.log(`[Chat ID: ${currentChatId}] DEBUG: دخلنا كتلة التحقق الرئيسية لتحليل آخر دقيقة.`);
+                            
 
                             // --- الخطوة 1: تسجيل السعر في بداية الدقيقة X9 (أو X4) ---
                             // (نقطة بدء تحليل "الشمعة" التي سندخل عليها صفقة عكسية)
                             // (يمكنك تغيير currentMinute % 10 === 9 إلى currentMinute % 5 === 4 إذا كنت تستهدف دورة 5 دقائق)
                             if (currentSecond === 0 && (currentMinute % 5 === 0)) {
                                 if (config.minuteOfLastDecision !== currentMinute) { // لمنع التكرار لنفس الدقيقة
-                                    config.priceAt0thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
+                                    config.priceAt1thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
                                     config.waitingForNextTrade = true; // الآن ننتظر أول تيك من الدقيقة التالية لإكمال التحليل
                                     config.minuteOfLastDecision = currentMinute; // لتسجيل أننا اتخذنا قرار في هذه الدقيقة
                                     saveUserStates(); // حفظ الحالة بعد تحديد نقطة البداية
@@ -232,22 +232,26 @@ function startBotForUser(chatId, config) {
                             // (يمكنك تغيير currentMinute % 10 === 0 إلى currentMinute % 5 === 0 إذا كنت تستهدف دورة 5 دقائق)
                             if (currentSecond === 0 && (currentMinute % 5 === 1) && config.waitingForNextTrade === true) {
 
+                                // حساب الدقيقة السابقة للتأكد من أنها دقيقة X9 أو X4 الصحيحة
+                                const minuteBeforeCurrent = (currentMinute === 0) ? 59 : currentMinute - 1;
+
+                                // التأكد من أن سعر الدقيقة X9 تم تسجيله ومن أننا كنا ننتظر هذه اللحظة
+                                if (config.priceAt0thMinuteStart !== null && (minuteBeforeCurrent % 5 === 0) && config.minuteO1fLastDecision === minuteBeforeCurrent) {
 
                                     const priceAt1thMinuteStart = currentTickPrice; // هذا هو "سعر الإغلاق" لدقيقة التحليل
-                                   let  tradeDirection = 'none';
+                                    let tradeDirection = 'none';
 
                                     if (priceAt1thMinuteStart < config.priceAt0thMinuteStart) {
-                                        tradeDirection = 'CALL'; // هبوط في الشمعة -> الصفقة التالية صعود
+                                        tradeDirection = 'PUT'; // هبوط في الشمعة -> الصفقة التالية صعود
                                     } else if (priceAt1thMinuteStart > config.priceAt0thMinuteStart) {
-                                        tradeDirection = 'PUT'; // صعود في الشمعة -> الصفقة التالية هبوط
+                                        tradeDirection = 'CALL'; // صعود في الشمعة -> الصفقة التالية هبوط
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
                                     }
-const minuteBeforeCurrent = (currentMinute === 0) ? 59 : currentMinute - 1;
-console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt0thMinuteStart.toFixed(3)}، سعر ${currentMinute}:00 هو ${priceAt1thMinuteStart.toFixed(3)}. الاتجاه: ${tradeDirection}`);
+
                                     // 🟢🟢🟢 رسالة تليجرام: تلخيص التحليل والاتجاه المتوقع 🟢🟢🟢
-                                    console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt1thMinuteStart.toFixed(3)}، سعر ${currentMinute}:00 هو ${priceAt0thMinuteStart.toFixed(3)}. الاتجاه: ${tradeDirection}`);
-                                    bot.sendMessage(currentChatId, `📊 تحليل الشمعة الأخيرة (${minuteBeforeCurrent}:00 -> ${currentMinute}:00):\nسعر البدء: ${config.priceAt1thMinuteStart.toFixed(3)}\nسعر الإغلاق: ${priceAt0thMinuteStart.toFixed(3)}\nالاتجاه المتوقع: ${tradeDirection}`);
+                                    console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt0thMinuteStart.toFixed(3)}، سعر ${currentMinute}:00 هو ${priceAt1thMinuteStart.toFixed(3)}. الاتجاه: ${tradeDirection}`);
+                                    bot.sendMessage(currentChatId, `📊 تحليل الشمعة الأخيرة (${minuteBeforeCurrent}:00 -> ${currentMinute}:00):\nسعر البدء: ${config.priceAt0thMinuteStart.toFixed(3)}\nسعر الإغلاق: ${priceAt1thMinuteStart.toFixed(3)}\nالاتجاه المتوقع: ${tradeDirection}`);
                                     // 🟢🟢🟢 نهاية الرسالة 🟢🟢🟢
 
                                     if (tradeDirection !== 'none' && !config.tradingCycleActive) {
@@ -281,7 +285,8 @@ console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان
                                 }
                             }
                         }
-                  
+                    }
+
 
 
         else if (msg.msg_type === 'proposal') {
