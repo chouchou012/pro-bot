@@ -150,7 +150,7 @@ function startBotForUser(chatId, config) {
     // لتخزين آخر تيك تم استقباله (مهم لتحديد نتيجة الصفقة)
     config.lastReceivedTickPrice = null;
     config.minuteOfLastDecision = null;
-    config.priceAt4thMinuteStart = null;
+    config.priceAt1thMinuteStart = null;
     config.waitingForNextTrade = false;
 
     ws.on('open', () => {
@@ -215,9 +215,9 @@ function startBotForUser(chatId, config) {
                             // --- الخطوة 1: تسجيل السعر في بداية الدقيقة X9 (أو X4) ---
                             // (نقطة بدء تحليل "الشمعة" التي سندخل عليها صفقة عكسية)
                             // (يمكنك تغيير currentMinute % 10 === 9 إلى currentMinute % 5 === 4 إذا كنت تستهدف دورة 5 دقائق)
-                            if (currentSecond === 0 && (currentMinute % 5 === 4)) {
+                            if (currentSecond === 0 && (currentMinute % 5 === 1)) {
                                 if (config.minuteOfLastDecision !== currentMinute) { // لمنع التكرار لنفس الدقيقة
-                                    config.priceAt4thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
+                                    config.priceAt1thMinuteStart = currentTickPrice; // هذا هو "سعر الافتتاح" لدقيقة التحليل
                                     config.waitingForNextTrade = true; // الآن ننتظر أول تيك من الدقيقة التالية لإكمال التحليل
                                     config.minuteOfLastDecision = currentMinute; // لتسجيل أننا اتخذنا قرار في هذه الدقيقة
                                     saveUserStates(); // حفظ الحالة بعد تحديد نقطة البداية
@@ -236,22 +236,22 @@ function startBotForUser(chatId, config) {
                                 const minuteBeforeCurrent = (currentMinute === 0) ? 59 : currentMinute - 1;
 
                                 // التأكد من أن سعر الدقيقة X9 تم تسجيله ومن أننا كنا ننتظر هذه اللحظة
-                                if (config.priceAt4thMinuteStart !== null && (minuteBeforeCurrent % 5 === 4) && config.minuteOfLastDecision === minuteBeforeCurrent) {
+                                if (config.priceAt4thMinuteStart !== null && (minuteBeforeCurrent % 5 === 1) && config.minuteOfLastDecision === minuteBeforeCurrent) {
 
                                     const priceAt0thMinuteStart = currentTickPrice; // هذا هو "سعر الإغلاق" لدقيقة التحليل
                                     let tradeDirection = 'none';
 
-                                    if (priceAt0thMinuteStart < config.priceAt4thMinuteStart) {
+                                    if (priceAt0thMinuteStart < config.priceAt1thMinuteStart) {
                                         tradeDirection = 'CALL'; // هبوط في الشمعة -> الصفقة التالية صعود
-                                    } else if (priceAt0thMinuteStart > config.priceAt4thMinuteStart) {
+                                    } else if (priceAt0thMinuteStart > config.priceAt1thMinuteStart) {
                                         tradeDirection = 'PUT'; // صعود في الشمعة -> الصفقة التالية هبوط
                                     } else {
                                         tradeDirection = 'none'; // لا تغيير
                                     }
 
                                     // 🟢🟢🟢 رسالة تليجرام: تلخيص التحليل والاتجاه المتوقع 🟢🟢🟢
-                                    console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt4thMinuteStart.toFixed(3)}، سعر ${currentMinute}:00 هو ${priceAt0thMinuteStart.toFixed(3)}. الاتجاه: ${tradeDirection}`);
-                                    bot.sendMessage(currentChatId, `📊 تحليل الشمعة الأخيرة (${minuteBeforeCurrent}:00 -> ${currentMinute}:00):\nسعر البدء: ${config.priceAt4thMinuteStart.toFixed(3)}\nسعر الإغلاق: ${priceAt0thMinuteStart.toFixed(3)}\nالاتجاه المتوقع: ${tradeDirection}`);
+                                    console.log(`[Chat ID: ${currentChatId}] سعر ${minuteBeforeCurrent}:00 كان ${config.priceAt1thMinuteStart.toFixed(3)}، سعر ${currentMinute}:00 هو ${priceAt0thMinuteStart.toFixed(3)}. الاتجاه: ${tradeDirection}`);
+                                    bot.sendMessage(currentChatId, `📊 تحليل الشمعة الأخيرة (${minuteBeforeCurrent}:00 -> ${currentMinute}:00):\nسعر البدء: ${config.priceAt1thMinuteStart.toFixed(3)}\nسعر الإغلاق: ${priceAt0thMinuteStart.toFixed(3)}\nالاتجاه المتوقع: ${tradeDirection}`);
                                     // 🟢🟢🟢 نهاية الرسالة 🟢🟢🟢
 
                                     if (tradeDirection !== 'none' && !config.tradingCycleActive) {
@@ -278,7 +278,7 @@ function startBotForUser(chatId, config) {
                                     }
 
                                     // إعادة تعيين هذه المتغيرات بعد معالجة القرار لهذه الدورة
-                                    config.priceAt4thMinuteStart = null;
+                                    config.priceAt1thMinuteStart = null;
                                     config.waitingForNextTrade = false;
                                     // config.minuteOfLastDecision يبقى كما هو لأنه سيتم تحديثه في بداية الدقيقة X9 التالية
                                     saveUserStates(); // حفظ الحالة بعد إعادة التعيين
@@ -552,7 +552,7 @@ bot.onText(/\/start/, (msg) => {
         token: '',
         lastReceivedTickPrice: null,
         minuteOfLastDecision: null,
-        priceAt4thMinuteStart: null,
+        priceAt1thMinuteStart: null,
         waitingForNextTrade: false,
     };
     saveUserStates();
@@ -598,7 +598,7 @@ bot.on('message', (msg) => {
         state.nextTradeDirection = null;
         state.lastReceivedTickPrice = null; 
         state.minuteOfLastDecision = null;
-        state.priceAt4thMinuteStart = null;
+        state.priceAt1thMinuteStart = null;
         state.waitingForNextTrade = false;
 
         saveUserStates();
@@ -634,7 +634,7 @@ bot.onText(/\/run/, (msg) => {
     user.nextTradeDirection = null;
     user.lastReceivedTickPrice = null; 
     user.minuteOfLastDecision = null;
-    user.priceAt4thMinuteStart = null;
+    user.priceAt1thMinuteStart = null;
     user.waitingForNextTrade = false;
 
     saveUserStates();
