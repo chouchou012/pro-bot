@@ -83,13 +83,6 @@ async function enterTrade(config, direction, chatId, ws) {
             config.currentTradeCountInCycle = 0;
             saveUserStates();
             return;
-        }
-openTrades.push({
-  id: proposalId,
-  direction: config.nextTradeDirection,
-  entrySpot: config.currentOpenContract.entrySpot,
-});
-  saveUserStates();
         config.currentOpenContract = {
             id: null, // ID العقد سيأتي من Deriv لاحقاً
             entrySpot: assumedEntrySpot, // سعر الدخول المفترض
