@@ -83,13 +83,16 @@ async function enterTrade(config, direction, chatId, ws) {
             config.currentTradeCountInCycle = 0;
             saveUserStates();
             return;
+        }
+
+        // تخزين تفاصيل العقد المفتوح حالياً باستخدام القيم المفترضة
         config.currentOpenContract = {
             id: null, // ID العقد سيأتي من Deriv لاحقاً
             entrySpot: assumedEntrySpot, // سعر الدخول المفترض
             entryTime: assumedEntryTime, // وقت الدخول المفترض
             type: direction, // نوع العقد
             expiryTime: assumedExpiryTime, // وقت الانتهاء المحسوب
-            longcode: null, // سيتم تحديثه لاحقاً
+            longcode: null // سيتم تحديثه لاحقاً
         };
         saveUserStates();
 
@@ -103,8 +106,8 @@ async function enterTrade(config, direction, chatId, ws) {
             "basis": "stake",
             "contract_type": direction, // 'CALL' (صعود) أو 'PUT' (هبوط)
             "currency": "USD",
-            "duration": 1,
-            "duration_unit": "m", // 1 دقيقة
+            "duration": 58,
+            "duration_unit": "s", // 1 دقيقة
             "symbol": "R_100" // الرمز الذي تتداول عليه
         }));
 
