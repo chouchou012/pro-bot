@@ -9,7 +9,8 @@ const accessList = JSON.parse(fs.readFileSync('access_list.json', 'utf8'));
 
 const USER_DATA_FILE = 'user_data.json';
 let userStates = {};
-let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مستخدم
+let userDerivConnections = {}; 
+let openTrades = [];
 
 // تعريف الثوابت للمضاعفات
 const MARTINGALE_FACTOR = 2.2;
@@ -83,15 +84,19 @@ async function enterTrade(config, direction, chatId, ws) {
             saveUserStates();
             return;
         }
-
-        // تخزين تفاصيل العقد المفتوح حالياً باستخدام القيم المفترضة
+openTrades.push({
+  id: proposalId,
+  direction: config.nextTradeDirection,
+  entrySpot: config.currentOpenContract.entrySpot,
+});
+  saveUserStates();
         config.currentOpenContract = {
             id: null, // ID العقد سيأتي من Deriv لاحقاً
             entrySpot: assumedEntrySpot, // سعر الدخول المفترض
             entryTime: assumedEntryTime, // وقت الدخول المفترض
             type: direction, // نوع العقد
             expiryTime: assumedExpiryTime, // وقت الانتهاء المحسوب
-            longcode: null // سيتم تحديثه لاحقاً
+            longcode: null, // سيتم تحديثه لاحقاً
         };
         saveUserStates();
 
@@ -200,7 +205,7 @@ function startBotForUser(chatId, config) {
             // منطق تحديد اتجاه الصفقة الأساسية (فقط عند بداية شمعة الـ 10 دقائق)
             if (config.running && !config.tradingCycleActive) {
                 // 🟢🟢🟢 DEBUG: جديد لمعرفة دخول الكتلة 🟢🟢🟢
-                console.log(`[Chat ID: ${currentChatId}] DEBUG: دخلنا كتلة التحقق الرئيسية لشمعة 10 دقائق.`);
+                
 
                 if (currentSecond === 0 && currentMinute === current10MinIntervalStartMinute) {
                      // 🟢🟢🟢 DEBUG: جديد لمعرفة توقيت بداية الشمعة 🟢🟢🟢
