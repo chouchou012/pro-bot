@@ -13,7 +13,7 @@ let userDerivConnections = {}; // لتخزين اتصال WebSocket لكل مس�
 
 // تعريف الثوابت للمضاعفات
 const MARTINGALE_FACTOR = 2.2;
-const MAX_MARTINGALE_TRADES = 4; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
+const MAX_MARTINGALE_TRADES = 6; // الحد الأقصى لعدد صفقات المضاعفة بعد الخسارة الأساسية
 
 // دالة لحفظ جميع حالات المستخدمين إلى ملف JSON
 function saveUserStates() {
@@ -154,7 +154,7 @@ function startBotForUser(chatId, config) {
         const currentChatId = chatId;
 
         // 🟢🟢🟢 DEBUG: سجل نوع الرسالة الواردة (تم تفعيله لأغراض التصحيح) 🟢🟢🟢
-        console.log(`[Chat ID: ${currentChatId}] RECEIVED MSG TYPE: ${msg.msg_type}`);
+       
 
         // إذا توقف البوت، أغلق الاتصال وتجاهل الرسائل
         if (!config.running && ws.readyState === WebSocket.OPEN) {
@@ -192,8 +192,7 @@ function startBotForUser(chatId, config) {
             config.lastReceivedTickPrice = currentTickPrice;
 
             // 🟢🟢🟢 DEBUG: يمكنك تفعيل هذا لمراقبة التيكات 🟢🟢🟢
-            console.log(`[Chat ID: ${currentChatId}] TICK: ${currentTickPrice.toFixed(3)} at ${tickDate.toLocaleTimeString()}`);
-            console.log(`[Chat ID: ${currentChatId}] Current Minute: ${currentMinute}, Current Second: ${currentSecond}`);
+            
 
 
             const current10MinIntervalStartMinute = Math.floor(currentMinute / 10) * 10;
@@ -209,7 +208,7 @@ function startBotForUser(chatId, config) {
 
                     if (config.lastProcessed10MinIntervalStart !== current10MinIntervalStartMinute) {
                         // 🟢🟢🟢 DEBUG: جديد لمعرفة بدء معالجة الشمعة 🟢🟢🟢
-                        console.log(`[Chat ID: ${currentChatId}] DEBUG: جاري معالجة فترة شمعة 10 دقائق جديدة.`);
+                        
 
                         let tradeDirection = 'none';
 
@@ -348,7 +347,7 @@ function startBotForUser(chatId, config) {
                                     }
 
                                     if (isWin) {
-                                        profit = config.currentStake * 0.95;
+                                        profit = config.currentStake * 0.88;
                                     } else {
                                         profit = -config.currentStake;
                                     }
@@ -428,7 +427,7 @@ function startBotForUser(chatId, config) {
                 config.currentStake = parseFloat((config.currentStake * MARTINGALE_FACTOR).toFixed(2));
 
                 if (config.currentTradeCountInCycle === 1) {
-                    config.nextTradeDirection = reverseDirection(config.baseTradeDirection);
+                    config.nextTradeDirection = config.baseTradeDirection;
                 }
 
                 messageText += `\n🔄 جاري مضاعفة المبلغ (مارتينغال رقم ${config.currentTradeCountInCycle}) إلى ${config.currentStake.toFixed(2)}. الصفقة التالية ستكون "${config.nextTradeDirection}".`;
