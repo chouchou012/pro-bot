@@ -135,7 +135,9 @@ function startBotForUser(chatId, config) {
         userDerivConnections[chatId].close();
         delete userDerivConnections[chatId];
     }
-
+if (userStates[chatId].currentOpenContract) {
+    config.currentOpenContract = userStates[chatId].currentOpenContract;
+  }
     // *** هام جداً: هذا هو URL الخاص بالخادم التجريبي (Demo) ***
     // تأكد أن الـ API Token الذي تستخدمه هو لحساب تجريبي ليعمل بشكل مستقر
     const ws = new WebSocket('wss://green.derivws.com/websockets/v3?app_id=22168');
@@ -396,7 +398,10 @@ function startBotForUser(chatId, config) {
     // دالة مساعدة لمعالجة نتائج الصفقة (تم فصلها لتجنب التكرار)
     function handleTradeResult(currentChatId, config, ws, result) {
         console.log(`[Chat ID: ${currentChatId}] Debug: handleTradeResult started. Result: `, result);
-
+if (config.currentOpenContract) {
+    userStates[currentChatId].currentOpenContract = config.currentOpenContract;
+    saveUserStates();
+  }
         const profit = result.profit;
         const isWin = result.win;
 
